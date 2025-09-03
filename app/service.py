@@ -21,6 +21,8 @@ import os
 import PyPDF2
 from docx import Document
 import uuid
+from transformers import pipeline, AutoTokenizer
+from bs4 import BeautifulSoup
 
 # Configure logging for the service module
 logging.basicConfig(level=logging.ERROR)
@@ -29,6 +31,10 @@ logging.basicConfig(level=logging.ERROR)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCX_PATH = os.path.join(BASE_DIR, 'static', 'download', 'file.docx')
 WORDCLOUD_PATH = os.path.join(BASE_DIR, 'static', 'img', 'wordcloud', 'wordcloud.png')
+
+# Initialize summarizer pipeline at module level
+summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large-cnn")
 
 def clean_text_and_generate_wordcloud(file_content):
     """
@@ -64,47 +70,25 @@ def clean_text_and_generate_wordcloud(file_content):
 
 def generate_bert_summary(cleaned_text):
     """
-    Generate a summary using the BERT model.
+    Generate a summary using a generative BERT-family model (BART).
 
     Args:
         cleaned_text (str): The cleaned input text.
 
     Returns:
-        str: The generated summary with proper sentence separation.
+        str: The generated summary.
     """
     try:
-        model = Summarizer()
-        result = model(cleaned_text, min_length=50)
-        
-        # Improved sentence detection and formatting
-        sentences = []
-        current_sentence = ""
-        
-        # Split into words and reconstruct sentences
-        words = result.split()
-        for word in words:
-            current_sentence += word + " "
-            # Check for sentence endings
-            if word.endswith(('.', '!', '?')) or (word[-1].isalnum() and len(current_sentence) > 50):
-                current_sentence = current_sentence.strip()
-                if not current_sentence[-1] in '.!?':
-                    current_sentence += '.'
-                if current_sentence[0].islower():
-                    current_sentence = current_sentence[0].upper() + current_sentence[1:]
-                sentences.append(current_sentence)
-                current_sentence = ""
-        
-        # Handle any remaining text
-        if current_sentence:
-            if not current_sentence[-1] in '.!?':
-                current_sentence += '.'
-            sentences.append(current_sentence.strip())
-        
-        # Join sentences with proper spacing
-        return ' '.join(sentences)
+        if not cleaned_text or len(cleaned_text.strip()) == 0:
+            return "No content to summarize."
+        # Truncate to first 1024 tokens for BART
+        input_ids = tokenizer.encode(cleaned_text, truncation=True, max_length=1024)
+        cleaned_text = tokenizer.decode(input_ids, skip_special_tokens=True)
+        result = summarizer(cleaned_text, max_length=200, min_length=50, do_sample=False)
+        return result[0]["summary_text"]
     except Exception as e:
         logging.error(f"Error generating summary: {e}")
-        return "Error generating summary"
+        return f"Error generating summary: {e}"
 
 def url_validator(url):
     """
@@ -142,7 +126,7 @@ def save_docx_file(summary_text):
 
 def fetch_article(url):
     """
-    Fetch the article text from the given URL.
+    Fetch the article text from the given URL. Tries newspaper3k first, then falls back to BeautifulSoup for homepages or multi-article pages. Now also extracts headlines and common news containers for richer summaries.
 
     Args:
         url (str): The URL of the article.
@@ -152,7 +136,24 @@ def fetch_article(url):
     """
     try:
         response = requests.get(url)
-        return fulltext(response.text)
+        text = fulltext(response.text)
+        # If the extracted text is too short, try to get more content using BeautifulSoup
+        if not text or len(text.split()) < 100:
+            soup = BeautifulSoup(response.text, "html.parser")
+            # Collect headlines and all visible paragraphs
+            headlines = []
+            for tag in ["h1", "h2", "h3"]:
+                headlines += [h.get_text(separator=" ", strip=True) for h in soup.find_all(tag)]
+            paragraphs = [p.get_text(separator=" ", strip=True) for p in soup.find_all("p")]
+            # Try to find common news containers
+            news_classes = ["content", "story", "article", "main", "news", "summary", "lead"]
+            news_blocks = []
+            for cls in news_classes:
+                for div in soup.find_all("div", class_=lambda x: x and cls in x):
+                    news_blocks.append(div.get_text(separator=" ", strip=True))
+            # Combine all extracted text
+            text = "\n".join(headlines + news_blocks + paragraphs)
+        return text
     except Exception as e:
         logging.error(f"Error fetching article: {e}")
         return "Error fetching article"
