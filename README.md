@@ -9,6 +9,11 @@ Textify is an AI-driven web application that provides on-demand text summarizati
 
 ---
 
+### Project Screenshot
+![Textify Application Screenshot](https://private-user-images.githubusercontent.com/60404707/486257841-6ccbba30-939f-4efc-9a13-61fcffc7ed9e.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NTcxMDA1ODYsIm5iZiI6MTc1NzEwMDI4NiwicGF0aCI6Ii82MDQwNDcwNy80ODYyNTc4NDEtNmNjYmJhMzAtOTM5Zi00ZWZjLTlhMTMtNjFmY2ZmYzdlZDllLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTA5MDUlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUwOTA1VDE5MjQ0NlomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWE0Nzg1MzQ1MjJhYWI4ODMxMjhlOTc2ZWU3OTU4YjkzNzE1Y2QyOTY3ZTc3YjQ3MTExNTVmMmRlNDYxOTNmNzImWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.JO1c-KvF60ZCA_xReA_qUi1VrUfd4je9NdAviPJrUVQ) 
+
+---
+
 ### The Problem It Solves
 In an era of information overload, professionals spend countless hours reading long articles and documents. Textify solves this business problem by providing a tool that can instantly distill lengthy content into its most critical points, saving time and improving productivity.
 
