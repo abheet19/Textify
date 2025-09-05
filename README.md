@@ -8,8 +8,10 @@ In an era of information overload, professionals spend countless hours reading l
 Textify is an AI-driven web application that provides on-demand text summarization and analysis. It can scrape content directly from a URL or analyze user-provided text, leveraging a Google BERT model to generate concise summaries and visual word clouds. The entire application is containerized and deployed on Google Cloud Platform with a full CI/CD pipeline.
 
 ---
+
 ### The Problem It Solves
 In an era of information overload, professionals spend countless hours reading long articles and documents. Textify solves this business problem by providing a tool that can instantly distill lengthy content into its most critical points, saving time and improving productivity.
+
 ---
 
 ### Key Features
@@ -20,6 +22,7 @@ In an era of information overload, professionals spend countless hours reading l
 - **Automated CI/CD Pipeline:** A complete CI/CD pipeline using GitHub Actions automatically builds and deploys the application on every push to the `main` branch.
 
 ---
+
 ### Tech Stack
 
 | Category         | Technologies                                                                 |
