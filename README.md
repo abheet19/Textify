@@ -1,6 +1,3 @@
-### The Problem It Solves
-In an era of information overload, professionals spend countless hours reading long articles and documents. Textify solves this business problem by providing a tool that can instantly distill lengthy content into its most critical points, saving time and improving productivity.
-
 # Textify: AI-Powered Text Summarizer & Web Scraper
 
 **[➡️ Live Demo Link](https://text-summarizer-bert-422876208346.europe-west1.run.app/)**
