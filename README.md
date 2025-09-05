@@ -1,42 +1,37 @@
-# Text Summarizer System (BERT)
+### The Problem It Solves
+In an era of information overload, professionals spend countless hours reading long articles and documents. Textify solves this business problem by providing a tool that can instantly distill lengthy content into its most critical points, saving time and improving productivity.
 
-Welcome to the Text Summarizer System powered by a BERT-based extractive summarizer.
+# Textify: AI-Powered Text Summarizer & Web Scraper
 
-## Table of Contents
+**[➡️ Live Demo Link](https://text-summarizer-bert-422876208346.europe-west1.run.app/)**
 
-1. Overview
-2. Tech Stack
-3. Installation and Requirements
-4. How to Run
-5. Detailed Theory
-6. Usage Workflow
-7. Additional Configuration & Deployment
-8. Contributing
-9. License
+Textify is an AI-driven web application that provides on-demand text summarization and analysis. It can scrape content directly from a URL or analyze user-provided text, leveraging a Google BERT model to generate concise summaries and visual word clouds. The entire application is containerized and deployed on Google Cloud Platform with a full CI/CD pipeline.
+
+---
+### The Problem It Solves
+In an era of information overload, professionals spend countless hours reading long articles and documents. Textify solves this business problem by providing a tool that can instantly distill lengthy content into its most critical points, saving time and improving productivity.
+---
+
+### Key Features
+- **Extractive Summarization with GenAI:** Utilizes a pre-trained Google BERT model to analyze text and extract the most relevant sentences, creating a high-quality summary.
+- **On-Demand Web Scraping:** Seamlessly fetches and parses article content from any provided URL using the `Newspaper3k` library.
+- **Visual Data Analysis:** Integrates `WordCloud` to generate a visual representation of the most frequent and important terms in the text.
+- **Cloud-Native Deployment:** The entire Flask application is containerized with Docker and deployed to Google Cloud Run for scalability and reliability.
+- **Automated CI/CD Pipeline:** A complete CI/CD pipeline using GitHub Actions automatically builds and deploys the application on every push to the `main` branch.
+
+---
+### Tech Stack
+
+| Category         | Technologies                                                                 |
+| ---------------- | ---------------------------------------------------------------------------- |
+| **AI/ML** | Python, Google BERT, Scikit-learn, Pandas, Newspaper3k, WordCloud            |
+| **Backend** | Flask, JavaScript                                                            |
+| **Frontend** | Bootstrap, HTML/CSS                                                          |
+| **Cloud & DevOps** | Google Cloud Run, Google Container Registry, Docker, CI/CD with GitHub Actions |
 
 ---
 
-## 1. Overview
-
-This web application generates short, coherent summaries from textual data, relying on BERT's transformer architecture to identify the most significant parts of the text. It allows:
-- Summarizing files (PDF, DOCX, TXT).
-- Summarizing text scraped from a URL.
-- Saving summaries to DOCX files along with a generated word cloud.
-
-## 2. Tech Stack
-
-- **Programming Language:** Python 3.10
-- **Frameworks:** Flask, Gunicorn
-- **Libraries:** BERT (Summarizer), PyPDF2, python-docx, Newspaper3k, WordCloud, Matplotlib
-- **Containerization:** Docker
-- **CI/CD:** GitHub Actions, Google Cloud Build
-- **Deployment:** Google Cloud Run
-- **Version Control:** Git
-- **Other Tools:** Docker, GitHub, Google Cloud Platform
-
----
-
-## 3. Installation and Requirements
+## . Installation and Requirements
 
 Before proceeding, ensure you have Python 3.x installed and Git available.  
 Install the dependencies using:
@@ -47,7 +42,7 @@ All library versions are explicitly listed in the [requirements.txt](requirement
 
 ---
 
-## 4. How to Run
+## . How to Run
 
 1. Clone or download this repository to your local machine.
 2. Navigate to the project directory:
@@ -71,7 +66,7 @@ All library versions are explicitly listed in the [requirements.txt](requirement
 
 ---
 
-## 5. Detailed Theory
+## . Detailed Theory
 
 Under the hood, this system uses an extractive summarization technique. Key highlights:
 - Uses the “Summarizer” library, leveraging a pretrained BERT model to rank sentences based on contextual embeddings.
@@ -80,14 +75,14 @@ Under the hood, this system uses an extractive summarization technique. Key high
 
 ---
 
-## 6. Usage Workflow
+## . Usage Workflow
 
 1. Upload a file under “Upload Document for Summarization” or provide a URL link in “Summarization by scraping a URL link content”.
 2. Once the text is processed, you can see the summary and optionally download a DOCX file containing the summary and word cloud.
 
 ---
 
-## 7. Additional Configuration & Deployment
+## . Additional Configuration & Deployment
 
 - Adjust environment variables in `.env` or `config.py` to set secret keys, debug modes, etc.
 - Containerize the application (e.g., using Docker) for consistent deployment across environments.
@@ -95,12 +90,12 @@ Under the hood, this system uses an extractive summarization technique. Key high
 
 ---
 
-## 8. Contributing
+## . Contributing
 
 Feel free to open issues, suggest improvements, or submit pull requests. Collaboration is welcome. Ensure you follow conventional commit messages and document your changes clearly.
 
 ---
 
-## 9. License
+## . License
 
 This project is provided “as is” for educational and practice purposes. For official licensing details, consult the LICENSE file (if present) or add a relevant open-source license of your choice.
