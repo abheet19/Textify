@@ -136,23 +136,26 @@ def fetch_article(url):
     """
     try:
         response = requests.get(url)
-        text = fulltext(response.text)
-        # If the extracted text is too short, try to get more content using BeautifulSoup
-        if not text or len(text.split()) < 100:
-            soup = BeautifulSoup(response.text, "html.parser")
-            # Collect headlines and all visible paragraphs
-            headlines = []
-            for tag in ["h1", "h2", "h3"]:
-                headlines += [h.get_text(separator=" ", strip=True) for h in soup.find_all(tag)]
-            paragraphs = [p.get_text(separator=" ", strip=True) for p in soup.find_all("p")]
-            # Try to find common news containers
-            news_classes = ["content", "story", "article", "main", "news", "summary", "lead"]
-            news_blocks = []
-            for cls in news_classes:
-                for div in soup.find_all("div", class_=lambda x: x and cls in x):
-                    news_blocks.append(div.get_text(separator=" ", strip=True))
-            # Combine all extracted text
-            text = "\n".join(headlines + news_blocks + paragraphs)
+        soup = BeautifulSoup(response.text, "html.parser")
+        # Collect all <article> tags
+        articles = soup.find_all("article")
+        article_texts = [a.get_text(separator=" ", strip=True) for a in articles]
+        # Collect headlines and all visible paragraphs
+        headlines = []
+        for tag in ["h1", "h2", "h3"]:
+            headlines += [h.get_text(separator=" ", strip=True) for h in soup.find_all(tag)]
+        paragraphs = [p.get_text(separator=" ", strip=True) for p in soup.find_all("p")]
+        # Try to find common news containers
+        news_classes = ["content", "story", "article", "main", "news", "summary", "lead"]
+        news_blocks = []
+        for cls in news_classes:
+            for div in soup.find_all("div", class_=lambda x: x and cls in x):
+                news_blocks.append(div.get_text(separator=" ", strip=True))
+        # Combine all extracted text for a larger summary
+        text = "\n".join(article_texts + headlines + news_blocks + paragraphs)
+        # If still too short, fallback to newspaper3k
+        if len(text.split()) < 100:
+            text = fulltext(response.text)
         return text
     except Exception as e:
         logging.error(f"Error fetching article: {e}")
