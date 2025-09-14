@@ -84,10 +84,10 @@
                 <div class="col-12">
                     <div class="section-heading text-center">
                         <div class="dream-dots justify-content-center wow fadeInUp" data-wow-delay="0.2s">
-                            <span>Extractive BERT summarizer by ©Abheet</span>
+                            <span>T5-Large AI Summarizer by ©Abheet</span>
                         </div>
                         <h2 class="wow fadeInUp" data-wow-delay="0.3s">Get your Summary here!</h2>
-                        <p class="wow fadeInUp mb-3" data-wow-delay="0.4s">You can see the result here or you can download a DOCX file</p>
+                        <p class="wow fadeInUp mb-3" data-wow-delay="0.4s">You can see the result here or download in DOCX or PDF format</p>
                     </div>
                 </div>
             </div>
@@ -95,29 +95,39 @@
             <div class="row justify-content-center">
                 <div class="col-12 col-md-10 col-lg-8">
                     <div class="contact_form">
-                        <form action="{{ url_for('api.download') }}" method="post" enctype="multipart/form-data" id="main_contact_form" novalidate>
-                            <div class="row">
-                                <div class="col-12">
-                                    <div id="success_fail_info"></div>
-                                </div>
+                        <div class="row">
+                            <div class="col-12">
+                                <div id="success_fail_info"></div>
+                            </div>
 
-                                <div class="col-12">
-                                    <div class="group wow fadeInUp" data-wow-delay="0.2s">
-                                        <div class="summary-box text-center p-4" id="summary">
-                                            {{ summary }}
-                                        </div>
-                                        <input type="hidden" name="summary" value="{{ summary }}">
-                                        <span class="highlight"></span>
-                                        <span class="bar"></span>
-                                        <label></label>
+                            <div class="col-12">
+                                <div class="group wow fadeInUp" data-wow-delay="0.2s">
+                                    <div class="summary-box text-center p-4" id="summary">
+                                        {{ summary }}
                                     </div>
-                                </div>
-                                
-                                <div class="col-12 text-center wow fadeInUp mt-2 mb-5" data-wow-delay="0.6s">
-                                    <button type="submit" class="btn dream-btn" id="download-btn" disabled>Download file</button>
+                                    <span class="highlight"></span>
+                                    <span class="bar"></span>
+                                    <label></label>
                                 </div>
                             </div>
-                        </form>
+                            
+                            <div class="col-12 text-center wow fadeInUp mt-4 mb-5" data-wow-delay="0.6s">
+                                <div class="download-buttons">
+                                    <form action="{{ url_for('api.download') }}" method="post" style="display: inline-block; margin-right: 10px;">
+                                        <input type="hidden" name="summary" value="{{ summary }}">
+                                        <button type="submit" class="btn dream-btn" id="download-docx-btn" disabled>
+                                            <i class="fa fa-file-word-o" aria-hidden="true"></i> Download DOCX
+                                        </button>
+                                    </form>
+                                    <form action="{{ url_for('api.download_pdf') }}" method="post" style="display: inline-block;">
+                                        <input type="hidden" name="summary" value="{{ summary }}">
+                                        <button type="submit" class="btn dream-btn" id="download-pdf-btn" disabled>
+                                            <i class="fa fa-file-pdf-o" aria-hidden="true"></i> Download PDF
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -178,14 +188,19 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const summary = document.getElementById('summary').innerText.trim();
-            const downloadBtn = document.getElementById('download-btn');
+            const downloadDocxBtn = document.getElementById('download-docx-btn');
+            const downloadPdfBtn = document.getElementById('download-pdf-btn');
             
             if (summary.length > 0) {
-                downloadBtn.disabled = false;
-                downloadBtn.classList.remove('disabled');
+                downloadDocxBtn.disabled = false;
+                downloadDocxBtn.classList.remove('disabled');
+                downloadPdfBtn.disabled = false;
+                downloadPdfBtn.classList.remove('disabled');
             } else {
-                downloadBtn.disabled = true;
-                downloadBtn.classList.add('disabled');
+                downloadDocxBtn.disabled = true;
+                downloadDocxBtn.classList.add('disabled');
+                downloadPdfBtn.disabled = true;
+                downloadPdfBtn.classList.add('disabled');
             }
         });
     </script>
@@ -197,6 +212,46 @@
             background-color: #f9f9f9;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             margin-top: 20px;
+        }
+        
+        .download-buttons {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .download-buttons .btn {
+            min-width: 150px;
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .download-buttons .btn i {
+            margin-right: 8px;
+            font-size: 16px;
+            vertical-align: middle;
+        }
+        
+        @media (max-width: 768px) {
+            .download-buttons {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .download-buttons form {
+                width: 100%;
+                margin: 0 !important;
+            }
+            
+            .download-buttons .btn {
+                width: 100%;
+            }
         }
     </style>
 </body>

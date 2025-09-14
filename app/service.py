@@ -1,27 +1,29 @@
 """
-Service layer for the Text Summarizer System using BERT.
+Service layer for the Text Summarizer System using T5-Large.
 
-This module provides functions to clean text, generate word clouds, summarize text using BERT,
-validate URLs, save summaries to DOCX files, fetch articles, and process uploaded files.
+This module provides functions to clean text, generate word clouds, summarize text using T5,
+validate URLs, save summaries to DOCX/PDF files, fetch articles, and process uploaded files.
 """
 
 import re
-from wordcloud import WordCloud
+import os
+import logging
+import pathlib
+import uuid
+from datetime import datetime
+from urllib.parse import urlparse
+
+import requests
+import PyPDF2
 import matplotlib
 matplotlib.use('Agg')  # Use the Agg backend to suppress the GUI warning
 import matplotlib.pyplot as plt
-import docx
-from urllib.parse import urlparse
-import requests
+from wordcloud import WordCloud
 from newspaper import fulltext
-import logging
-import pathlib
-import os
-import PyPDF2
-from docx import Document
-import uuid
-from transformers import pipeline, AutoTokenizer
 from bs4 import BeautifulSoup
+from docx import Document
+import docx
+from transformers import pipeline, AutoTokenizer
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -32,7 +34,6 @@ logging.basicConfig(level=logging.ERROR)
 
 # Update constants with absolute paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DOCX_PATH = os.path.join(BASE_DIR, 'static', 'download', 'file.docx')
 WORDCLOUD_PATH = os.path.join(BASE_DIR, 'static', 'img', 'wordcloud', 'wordcloud.png')
 
 # Initialize summarizer pipeline at module level
@@ -135,23 +136,6 @@ def url_validator(url):
     except Exception as e:
         logging.error(f"Error validating URL: {e}")
         return False, "Error validating URL format."
-
-def save_docx_file(summary_text):
-    """
-    Save summary and word cloud image to a DOCX file.
-
-    Args:
-        summary_text (str): The summary text to be saved.
-    """
-    try:
-        os.makedirs(os.path.dirname(DOCX_PATH), exist_ok=True)
-        mydoc = docx.Document()
-        mydoc.add_heading("Summary", 0)
-        mydoc.add_paragraph(summary_text)
-        mydoc.add_picture(WORDCLOUD_PATH, width=docx.shared.Inches(5), height=docx.shared.Inches(6))
-        mydoc.save(DOCX_PATH)
-    except Exception as e:
-        logging.error(f"Error saving DOCX file: {e}")
 
 def fetch_article(url):
     """
@@ -256,9 +240,6 @@ def summarize_url(url):
         if summary_text.startswith("Error") or summary_text.startswith("Text too short"):
             return summary_text
         
-        # Save files in multiple formats
-        save_multiple_formats(summary_text)
-        
         return summary_text
     except Exception as e:
         logging.error(f"Error summarizing URL: {e}")
@@ -266,15 +247,11 @@ def summarize_url(url):
 
 def remove_files():
     """
-    Remove previously generated word cloud and DOCX files if present.
+    Remove previously generated word cloud files if present.
     """
     wordcloud_file = pathlib.Path(WORDCLOUD_PATH)
     if wordcloud_file.is_file():
         os.remove(wordcloud_file)
-
-    docx_file = pathlib.Path(DOCX_PATH)
-    if docx_file.is_file():
-        os.remove(docx_file)
 
 def process_file(uploaded_file):
     """
@@ -314,8 +291,9 @@ def generate_docx(summary):
         str: The file path of the generated DOCX file.
     """
     try:
-        # Create a unique filename
-        filename = f"summary_{uuid.uuid4().hex}.docx"
+        # Create a descriptive filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"Text_Summary_Report_{timestamp}.docx"
         file_path = os.path.join(BASE_DIR, 'downloads', filename)
 
         # Ensure the downloads directory exists
@@ -351,7 +329,8 @@ def generate_pdf(summary, output_path=None):
     try:
         # Create a unique filename if no path provided
         if not output_path:
-            filename = f"summary_{uuid.uuid4().hex}.pdf"
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"Text_Summary_Report_{timestamp}.pdf"
             output_path = os.path.join(BASE_DIR, 'downloads', filename)
 
         # Ensure the downloads directory exists
@@ -397,33 +376,6 @@ def generate_pdf(summary, output_path=None):
     except Exception as e:
         logging.error(f"Error generating PDF: {e}")
         raise
-
-def save_multiple_formats(summary_text):
-    """
-    Save summary in multiple formats (DOCX and PDF).
-
-    Args:
-        summary_text (str): The summary text to be saved.
-    
-    Returns:
-        dict: Paths to generated files
-    """
-    try:
-        files = {}
-        
-        # Generate DOCX
-        save_docx_file(summary_text)
-        files['docx'] = DOCX_PATH
-        
-        # Generate PDF
-        pdf_filename = f"summary_{uuid.uuid4().hex}.pdf"
-        pdf_path = os.path.join(BASE_DIR, 'downloads', pdf_filename)
-        files['pdf'] = generate_pdf(summary_text, pdf_path)
-        
-        return files
-    except Exception as e:
-        logging.error(f"Error saving multiple formats: {e}")
-        return {}
 
 def safe_remove_and_render(template_name, render_template_func):
     """
