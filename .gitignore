@@ -100,3 +100,18 @@ Thumbs.db
 # Ignore log files and directories inside app
 app/logs/
 app/*.log
+
+# Application-specific generated files
+downloads/
+static/download/
+static/img/wordcloud/
+logs/
+*.log
+
+# Test files (optional - remove if you want to track them)
+test_*.py
+
+# BERT model files and cache
+bert-*/
+.cache/
+huggingface_cache/

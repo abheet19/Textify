@@ -1,6 +1,5 @@
 annotated-types==0.7.0
 beautifulsoup4==4.12.3
-bert-extractive-summarizer==0.10.1
 blinker==1.9.0
 catalogue==2.0.10
 certifi==2024.12.14
@@ -62,6 +61,7 @@ python-dotenv==1.0.1
 pytz==2024.2
 pyyaml==6.0.2
 regex==2024.11.6
+reportlab==4.0.9
 requests==2.32.3
 requests-file==2.1.0
 rich==13.9.4

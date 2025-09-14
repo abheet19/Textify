@@ -10,7 +10,6 @@ from wordcloud import WordCloud
 import matplotlib
 matplotlib.use('Agg')  # Use the Agg backend to suppress the GUI warning
 import matplotlib.pyplot as plt
-from summarizer import Summarizer
 import docx
 from urllib.parse import urlparse
 import requests
@@ -23,6 +22,10 @@ from docx import Document
 import uuid
 from transformers import pipeline, AutoTokenizer
 from bs4 import BeautifulSoup
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
 
 # Configure logging for the service module
 logging.basicConfig(level=logging.ERROR)
@@ -33,8 +36,8 @@ DOCX_PATH = os.path.join(BASE_DIR, 'static', 'download', 'file.docx')
 WORDCLOUD_PATH = os.path.join(BASE_DIR, 'static', 'img', 'wordcloud', 'wordcloud.png')
 
 # Initialize summarizer pipeline at module level
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large-cnn")
+summarizer = pipeline("summarization", model="t5-large")
+tokenizer = AutoTokenizer.from_pretrained("t5-large")
 
 def clean_text_and_generate_wordcloud(file_content):
     """
@@ -70,7 +73,7 @@ def clean_text_and_generate_wordcloud(file_content):
 
 def generate_bert_summary(cleaned_text):
     """
-    Generate a summary using a generative BERT-family model (BART).
+    Generate a summary using T5-large model for better quality.
 
     Args:
         cleaned_text (str): The cleaned input text.
@@ -81,31 +84,57 @@ def generate_bert_summary(cleaned_text):
     try:
         if not cleaned_text or len(cleaned_text.strip()) == 0:
             return "No content to summarize."
-        # Truncate to first 1024 tokens for BART
-        input_ids = tokenizer.encode(cleaned_text, truncation=True, max_length=1024)
+        
+        # Ensure minimum length for meaningful summarization
+        if len(cleaned_text.split()) < 30:
+            return "Text too short for summarization. Please provide more content."
+        
+        # Truncate to first 512 tokens for T5 (T5 has lower max input than BART)
+        input_ids = tokenizer.encode(cleaned_text, truncation=True, max_length=512)
         cleaned_text = tokenizer.decode(input_ids, skip_special_tokens=True)
-        result = summarizer(cleaned_text, max_length=200, min_length=50, do_sample=False)
+        
+        # Add T5 prefix for summarization task
+        input_text = f"summarize: {cleaned_text}"
+        
+        result = summarizer(input_text, max_length=200, min_length=50, do_sample=False)
         return result[0]["summary_text"]
     except Exception as e:
         logging.error(f"Error generating summary: {e}")
-        return f"Error generating summary: {e}"
+        return f"Error generating summary. Please try with different content or check your internet connection."
 
 def url_validator(url):
     """
-    Validate the given URL.
+    Validate the given URL with detailed error messages.
 
     Args:
         url (str): The URL to be validated.
 
     Returns:
-        bool: True if the URL is valid, False otherwise.
+        tuple: (bool, str) - (is_valid, error_message)
     """
     try:
+        if not url or not url.strip():
+            return False, "Please enter a URL."
+        
+        url = url.strip()
+        
+        # Add http:// if no scheme is provided
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+        
         result = urlparse(url)
-        return all([result.scheme, result.netloc, result.path])
+        
+        if not all([result.scheme, result.netloc]):
+            return False, "Invalid URL format. Please check the URL and try again."
+        
+        # Check for common invalid patterns
+        if result.netloc.count('.') == 0:
+            return False, "Invalid domain name. Please include a valid domain (e.g., example.com)."
+        
+        return True, url  # Return the normalized URL
     except Exception as e:
         logging.error(f"Error validating URL: {e}")
-        return False
+        return False, "Error validating URL format."
 
 def save_docx_file(summary_text):
     """
@@ -126,7 +155,7 @@ def save_docx_file(summary_text):
 
 def fetch_article(url):
     """
-    Fetch the article text from the given URL. Tries newspaper3k first, then falls back to BeautifulSoup for homepages or multi-article pages. Now also extracts headlines and common news containers for richer summaries.
+    Fetch the article text from the given URL with improved error handling.
 
     Args:
         url (str): The URL of the article.
@@ -135,35 +164,65 @@ def fetch_article(url):
         str: The article text.
     """
     try:
-        response = requests.get(url)
+        # Add timeout and headers for better scraping
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        
         soup = BeautifulSoup(response.text, "html.parser")
+        
+        # Remove script and style elements
+        for script in soup(["script", "style", "nav", "footer", "header"]):
+            script.decompose()
+        
         # Collect all <article> tags
         articles = soup.find_all("article")
-        article_texts = [a.get_text(separator=" ", strip=True) for a in articles]
+        article_texts = [a.get_text(separator=" ", strip=True) for a in articles if a.get_text(strip=True)]
+        
         # Collect headlines and all visible paragraphs
         headlines = []
         for tag in ["h1", "h2", "h3"]:
-            headlines += [h.get_text(separator=" ", strip=True) for h in soup.find_all(tag)]
-        paragraphs = [p.get_text(separator=" ", strip=True) for p in soup.find_all("p")]
+            headlines += [h.get_text(separator=" ", strip=True) for h in soup.find_all(tag) if h.get_text(strip=True)]
+        
+        paragraphs = [p.get_text(separator=" ", strip=True) for p in soup.find_all("p") if p.get_text(strip=True)]
+        
         # Try to find common news containers
-        news_classes = ["content", "story", "article", "main", "news", "summary", "lead"]
+        news_classes = ["content", "story", "article", "main", "news", "summary", "lead", "post-content", "entry-content"]
         news_blocks = []
         for cls in news_classes:
             for div in soup.find_all("div", class_=lambda x: x and cls in x):
-                news_blocks.append(div.get_text(separator=" ", strip=True))
+                text = div.get_text(separator=" ", strip=True)
+                if text and len(text.split()) > 10:  # Only add substantial content
+                    news_blocks.append(text)
+        
         # Combine all extracted text for a larger summary
-        text = "\n".join(article_texts + headlines + news_blocks + paragraphs)
+        all_text = article_texts + headlines + news_blocks + paragraphs
+        text = "\n".join([t for t in all_text if t])  # Filter out empty strings
+        
         # If still too short, fallback to newspaper3k
         if len(text.split()) < 100:
             text = fulltext(response.text)
+        
+        # Final check
+        if not text or len(text.split()) < 50:
+            return f"Unable to extract sufficient content from the URL. The page may require JavaScript or have anti-scraping measures."
+        
         return text
+    except requests.exceptions.Timeout:
+        return "Error: Request timed out. The website took too long to respond."
+    except requests.exceptions.ConnectionError:
+        return "Error: Unable to connect to the website. Please check your internet connection."
+    except requests.exceptions.HTTPError as e:
+        return f"Error: HTTP {e.response.status_code} - {e.response.reason}"
     except Exception as e:
         logging.error(f"Error fetching article: {e}")
-        return "Error fetching article"
+        return f"Error fetching article: {str(e)}"
 
 def summarize_url(url):
     """
-    Summarize the article from the given URL.
+    Summarize the article from the given URL with improved error handling.
 
     Args:
         url (str): The URL of the article.
@@ -172,16 +231,38 @@ def summarize_url(url):
         str: The summary of the article.
     """
     try:
-        if not url_validator(url):
-            return "Invalid URL"
-        article_text = fetch_article(url)
+        # Validate URL
+        is_valid, result = url_validator(url)
+        if not is_valid:
+            return result  # Return error message
+        
+        # Use the normalized URL
+        normalized_url = result
+        
+        # Fetch article
+        article_text = fetch_article(normalized_url)
+        
+        # Check if fetch was successful
+        if article_text.startswith("Error"):
+            return article_text
+        
+        # Clean text and generate word cloud
         cleaned_text = clean_text_and_generate_wordcloud(article_text)
+        
+        # Generate summary
         summary_text = generate_bert_summary(cleaned_text)
-        save_docx_file(summary_text)
+        
+        # Check if summarization was successful
+        if summary_text.startswith("Error") or summary_text.startswith("Text too short"):
+            return summary_text
+        
+        # Save files in multiple formats
+        save_multiple_formats(summary_text)
+        
         return summary_text
     except Exception as e:
         logging.error(f"Error summarizing URL: {e}")
-        return "Error summarizing URL"
+        return f"Error summarizing URL: {str(e)}. Please try again or use a different URL."
 
 def remove_files():
     """
@@ -255,6 +336,94 @@ def generate_docx(summary):
     except Exception as e:
         logging.error(f"Error generating DOCX: {e}")
         raise
+
+def generate_pdf(summary, output_path=None):
+    """
+    Generate a PDF file with the summary and word cloud image.
+
+    Args:
+        summary (str): The summary text to be included in the PDF file.
+        output_path (str): Optional custom output path.
+
+    Returns:
+        str: The file path of the generated PDF file.
+    """
+    try:
+        # Create a unique filename if no path provided
+        if not output_path:
+            filename = f"summary_{uuid.uuid4().hex}.pdf"
+            output_path = os.path.join(BASE_DIR, 'downloads', filename)
+
+        # Ensure the downloads directory exists
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        # Create PDF document
+        doc = SimpleDocTemplate(output_path, pagesize=letter)
+        styles = getSampleStyleSheet()
+        story = []
+
+        # Title
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            spaceAfter=30,
+            alignment=1  # Center alignment
+        )
+        story.append(Paragraph("Text Summary Report", title_style))
+        story.append(Spacer(1, 12))
+
+        # Summary content
+        summary_style = ParagraphStyle(
+            'SummaryStyle',
+            parent=styles['Normal'],
+            fontSize=12,
+            spaceAfter=12,
+            leading=16
+        )
+        story.append(Paragraph("Summary:", styles['Heading2']))
+        story.append(Paragraph(summary, summary_style))
+        story.append(Spacer(1, 20))
+
+        # Add word cloud if it exists
+        if os.path.exists(WORDCLOUD_PATH):
+            story.append(Paragraph("Word Cloud:", styles['Heading2']))
+            img = Image(WORDCLOUD_PATH, width=4*inch, height=3*inch)
+            story.append(img)
+
+        # Build PDF
+        doc.build(story)
+        return output_path
+    except Exception as e:
+        logging.error(f"Error generating PDF: {e}")
+        raise
+
+def save_multiple_formats(summary_text):
+    """
+    Save summary in multiple formats (DOCX and PDF).
+
+    Args:
+        summary_text (str): The summary text to be saved.
+    
+    Returns:
+        dict: Paths to generated files
+    """
+    try:
+        files = {}
+        
+        # Generate DOCX
+        save_docx_file(summary_text)
+        files['docx'] = DOCX_PATH
+        
+        # Generate PDF
+        pdf_filename = f"summary_{uuid.uuid4().hex}.pdf"
+        pdf_path = os.path.join(BASE_DIR, 'downloads', pdf_filename)
+        files['pdf'] = generate_pdf(summary_text, pdf_path)
+        
+        return files
+    except Exception as e:
+        logging.error(f"Error saving multiple formats: {e}")
+        return {}
 
 def safe_remove_and_render(template_name, render_template_func):
     """
