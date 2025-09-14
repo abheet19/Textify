@@ -102,8 +102,20 @@
 
                             <div class="col-12">
                                 <div class="group wow fadeInUp" data-wow-delay="0.2s">
-                                    <div class="summary-box text-center p-4" id="summary">
-                                        {{ summary }}
+                                    <div class="summary-container">
+                                        <div class="summary-header">
+                                            <h4><i class="fa fa-file-text-o"></i> AI-Generated Summary</h4>
+                                            <span class="summary-badge">T5-Large AI</span>
+                                        </div>
+                                        <div class="summary-content" id="summary">
+                                            {{ summary|safe }}
+                                        </div>
+                                        <div class="summary-footer">
+                                            <span class="summary-info">
+                                                <i class="fa fa-info-circle"></i> 
+                                                Generated using advanced T5-Large AI model for optimal accuracy
+                                            </span>
+                                        </div>
                                     </div>
                                     <span class="highlight"></span>
                                     <span class="bar"></span>
@@ -206,12 +218,105 @@
     </script>
 
     <style>
-        .summary-box {
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background-color: #f9f9f9;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            margin-top: 20px;
+        .summary-container {
+            background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+            border: 1px solid #e1e5e9;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            margin: 30px 0;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .summary-container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12);
+        }
+        
+        .summary-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .summary-header h4 {
+            margin: 0;
+            font-size: 1.3rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .summary-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+        }
+        
+        .summary-content {
+            padding: 30px 25px;
+            line-height: 1.8;
+            font-size: 1.1rem;
+            color: #2c3e50;
+            text-align: left;
+            font-family: 'Georgia', 'Times New Roman', serif;
+            background: white;
+            white-space: pre-line;
+        }
+        
+        .summary-content::first-letter {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+            margin-right: 2px;
+        }
+        
+        .summary-footer {
+            background: #f8f9fa;
+            padding: 15px 25px;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .summary-info {
+            color: #6c757d;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .summary-info i {
+            color: #667eea;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .summary-container {
+                margin: 20px 0;
+            }
+            
+            .summary-header {
+                padding: 15px 20px;
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+            
+            .summary-content {
+                padding: 25px 20px;
+                font-size: 1rem;
+            }
+            
+            .summary-footer {
+                padding: 12px 20px;
+            }
         }
         
         .download-buttons {

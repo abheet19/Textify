@@ -80,7 +80,7 @@ def generate_bert_summary(cleaned_text):
         cleaned_text (str): The cleaned input text.
 
     Returns:
-        str: The generated summary.
+        str: The generated summary with improved formatting.
     """
     try:
         if not cleaned_text or len(cleaned_text.strip()) == 0:
@@ -98,10 +98,69 @@ def generate_bert_summary(cleaned_text):
         input_text = f"summarize: {cleaned_text}"
         
         result = summarizer(input_text, max_length=200, min_length=50, do_sample=False)
-        return result[0]["summary_text"]
+        summary = result[0]["summary_text"]
+        
+        # Post-process the summary for better formatting
+        summary = format_summary_text(summary)
+        return summary
+        
     except Exception as e:
         logging.error(f"Error generating summary: {e}")
         return f"Error generating summary. Please try with different content or check your internet connection."
+
+def format_summary_text(summary):
+    """
+    Format and polish the summary text for better presentation.
+    
+    Args:
+        summary (str): Raw summary text from T5 model
+        
+    Returns:
+        str: Formatted and polished summary text with HTML formatting
+    """
+    try:
+        # Remove extra whitespace and normalize spacing
+        summary = re.sub(r'\s+', ' ', summary.strip())
+        
+        # Ensure proper sentence endings
+        if not summary.endswith('.'):
+            summary += '.'
+        
+        # Capitalize first letter
+        summary = summary[0].upper() + summary[1:] if len(summary) > 1 else summary.upper()
+        
+        # Split into sentences for better formatting
+        sentences = re.split(r'(?<=[.!?])\s+', summary)
+        
+        # If we have multiple sentences, create formatted paragraphs
+        if len(sentences) > 3:
+            # Group sentences into paragraphs (2-3 sentences each)
+            paragraphs = []
+            current_paragraph = []
+            
+            for i, sentence in enumerate(sentences):
+                current_paragraph.append(sentence)
+                
+                # Create paragraph break every 2-3 sentences
+                if len(current_paragraph) >= 2 and i < len(sentences) - 1:
+                    paragraphs.append(' '.join(current_paragraph))
+                    current_paragraph = []
+            
+            # Add remaining sentences
+            if current_paragraph:
+                paragraphs.append(' '.join(current_paragraph))
+            
+            # Join paragraphs with double line breaks
+            summary = '\n\n'.join(paragraphs)
+        
+        # Clean up any extra spaces
+        summary = re.sub(r' +', ' ', summary)
+        
+        return summary.strip()
+        
+    except Exception as e:
+        logging.error(f"Error formatting summary: {e}")
+        return summary
 
 def url_validator(url):
     """
