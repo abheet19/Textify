@@ -1,29 +1,26 @@
 steps:
   # Step 1: Build the Docker image with a unique tag
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/text-summarizer-bert/text-summarizer-bert:${SHORT_SHA}', '.']
+    args: ['build', '-t', 'gcr.io/text-summarizer-bert/text-summarizer-bert:latest', '.']
 
   # Step 2: Push the Docker image with the unique tag
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/text-summarizer-bert/text-summarizer-bert:${SHORT_SHA}']
+    args: ['push', 'gcr.io/text-summarizer-bert/text-summarizer-bert:latest']
 
   # Step 3: Deploy the Docker image to Google Cloud Run
   - name: 'gcr.io/cloud-builders/gcloud'
     args: [
       'run', 'deploy', 'text-summarizer-bert',
-      '--image', 'gcr.io/text-summarizer-bert/text-summarizer-bert:${SHORT_SHA}',
+      '--image', 'gcr.io/text-summarizer-bert/text-summarizer-bert:latest',
       '--platform', 'managed',
-      '--region', 'europe-west1',  # Changed from us-east1 to europe-west1
+      '--region', 'europe-west1',
       '--allow-unauthenticated'
     ]
 
 images:
-  - 'gcr.io/text-summarizer-bert/text-summarizer-bert:${SHORT_SHA}'
+  - 'gcr.io/text-summarizer-bert/text-summarizer-bert:latest'
 
 timeout: '1600s'
 
 options:
   logging: CLOUD_LOGGING_ONLY
-
-substitutions:
-  SHORT_SHA: '${COMMIT_SHA:0:7}'

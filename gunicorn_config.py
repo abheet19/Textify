@@ -7,7 +7,7 @@ worker_class = "sync"  # Worker type
 timeout = 120  # Workers silent for more than this many seconds are killed and restarted
 keepalive = 5  # How long to wait for requests on a Keep-Alive connection
 
-# Logging configuration
-accesslog = 'logs/gunicorn_access.log'
-errorlog = 'logs/gunicorn_error.log'
+# Logging configuration - Use stdout/stderr for Cloud Run
+accesslog = '-'  # stdout
+errorlog = '-'   # stderr
 loglevel = 'info'

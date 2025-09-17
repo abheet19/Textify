@@ -26,14 +26,24 @@ def create_app():
     
     # Configure logging
     if not app.debug:
-        if not os.path.exists('logs'):
-            os.mkdir('logs')
-        file_handler = RotatingFileHandler('logs/text_summarizer.log', maxBytes=10240, backupCount=10)
-        file_handler.setFormatter(
-            logging.Formatter('%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]')
-        )
-        file_handler.setLevel(logging.INFO)
-        app.logger.addHandler(file_handler)
+        try:
+            # Try to create logs directory and file logging
+            if not os.path.exists('logs'):
+                os.makedirs('logs', exist_ok=True)
+            file_handler = RotatingFileHandler('logs/text_summarizer.log', maxBytes=10240, backupCount=10)
+            file_handler.setFormatter(
+                logging.Formatter('%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]')
+            )
+            file_handler.setLevel(logging.INFO)
+            app.logger.addHandler(file_handler)
+        except (OSError, PermissionError):
+            # If file logging fails (like in Cloud Run), just use stdout
+            console_handler = logging.StreamHandler()
+            console_handler.setFormatter(
+                logging.Formatter('%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]')
+            )
+            console_handler.setLevel(logging.INFO)
+            app.logger.addHandler(console_handler)
         
         app.logger.setLevel(logging.INFO)
         app.logger.info('Text Summarizer System startup')

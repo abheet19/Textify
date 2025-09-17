@@ -16,6 +16,9 @@ RUN pip install -r requirements.txt
 # Copy project
 COPY . /app/
 
+# Create necessary directories
+RUN mkdir -p logs downloads static/img/wordcloud
+
 # Expose the port
 EXPOSE 8080
 
