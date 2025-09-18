@@ -20,11 +20,8 @@ from .service import (
     clean_text_and_generate_wordcloud,
     generate_bert_summary,
     summarize_url,
-    remove_files,
-    process_file,
-    generate_docx,
-    generate_pdf,
-    safe_remove_and_render
+    generate_pdf_report,
+    generate_docx_report
 )
 
 # Configure logging for the API module
@@ -85,6 +82,84 @@ def process_summary_request(input_data, input_type="file"):
         return False, f"Error processing {input_type}: {str(e)}"
     
     return False, f"Unknown {input_type} processing error"
+
+def process_file(file_obj):
+    """
+    Process uploaded file and extract text content.
+    
+    Args:
+        file_obj: Flask file object
+        
+    Returns:
+        str: Extracted text content
+    """
+    try:
+        if file_obj.filename.lower().endswith('.txt'):
+            return file_obj.read().decode('utf-8')
+        else:
+            raise ValueError(f"Unsupported file type: {file_obj.filename}")
+    except Exception as e:
+        raise ValueError(f"Error processing file: {str(e)}")
+
+def safe_remove_and_render(template_name, render_func, **kwargs):
+    """
+    Safely render template and remove temporary files.
+    
+    Args:
+        template_name (str): Template name to render
+        render_func: Render function (usually render_template)
+        **kwargs: Additional arguments for template rendering
+        
+    Returns:
+        Response: Rendered template response
+    """
+    remove_files()
+    return render_func(template_name, **kwargs)
+
+def remove_files():
+    """
+    Remove temporary files from static directories.
+    """
+    try:
+        # Remove word cloud images
+        static_dir = os.path.join(os.path.dirname(__file__), 'static', 'img', 'wordcloud')
+        if os.path.exists(static_dir):
+            for file in os.listdir(static_dir):
+                if file.endswith(('.png', '.jpg', '.jpeg')):
+                    os.remove(os.path.join(static_dir, file))
+        
+        # Remove temporary download files
+        download_dir = os.path.join(os.path.dirname(__file__), 'static', 'download')
+        if os.path.exists(download_dir):
+            for file in os.listdir(download_dir):
+                if file.endswith(('.docx', '.pdf')):
+                    os.remove(os.path.join(download_dir, file))
+    except Exception as e:
+        logging.warning(f"Error removing files: {str(e)}")
+
+def generate_docx(summary_text):
+    """
+    Generate DOCX file from summary text.
+    
+    Args:
+        summary_text (str): Summary text to convert
+        
+    Returns:
+        str: Path to generated DOCX file
+    """
+    return generate_docx_report(summary_text)
+
+def generate_pdf(summary_text):
+    """
+    Generate PDF file from summary text.
+    
+    Args:
+        summary_text (str): Summary text to convert
+        
+    Returns:
+        str: Path to generated PDF file
+    """
+    return generate_pdf_report(summary_text)
 
 @api.route('/', methods=['GET', 'POST'])
 def home():

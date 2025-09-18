@@ -4,6 +4,7 @@ FROM python:3.10-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PORT=8080
 
 # Set work directory
 WORKDIR /app
@@ -22,5 +23,6 @@ RUN mkdir -p logs downloads static/img/wordcloud
 # Expose the port
 EXPOSE 8080
 
-# Command to run the application
-CMD ["gunicorn", "--config", "gunicorn_config.py", "run:app"]
+# Command to run the application - Use Flask directly instead of Gunicorn
+# Command to run the application using Flask directly
+CMD exec python run.py

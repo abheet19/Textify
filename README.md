@@ -97,10 +97,56 @@ The application automatically downloads the T5-Large model on first run. Ensure 
 
 ## 🐳 Docker Deployment
 
+### Local Docker
 ```bash
-# Build and run with Docker
+# Build and run with Docker locally
 docker build -t textify .
 docker run -p 5000:5000 textify
+```
+
+### Google Cloud Run Deployment
+
+#### Method 1: Using Cloud Build (Automatic)
+```bash
+# Push code to trigger automatic deployment
+git add -A
+git commit -m "Deploy to Google Cloud"
+git push origin master
+
+# Or manually trigger Cloud Build
+gcloud builds submit --config=cloudbuild.yaml .
+```
+
+#### Method 2: Docker Build & Push (Manual)
+```bash
+# 1. Build Docker image locally
+docker build -t gcr.io/text-summarizer-bert/text-summarizer-bert .
+
+# 2. Configure Docker authentication
+gcloud auth configure-docker
+
+# 3. Push image to Google Container Registry
+docker push gcr.io/text-summarizer-bert/text-summarizer-bert
+
+# 4. Deploy to Cloud Run
+gcloud run deploy text-summarizer-bert \
+  --image gcr.io/text-summarizer-bert/text-summarizer-bert \
+  --platform managed \
+  --region europe-west1 \
+  --allow-unauthenticated \
+  --memory 4Gi \
+  --cpu 2 \
+  --timeout 900 \
+  --set-env-vars="FLASK_ENV=production"
+```
+
+#### Prerequisites for Google Cloud Deployment
+```bash
+# Set up project and enable APIs
+gcloud config set project text-summarizer-bert
+gcloud services enable cloudbuild.googleapis.com
+gcloud services enable run.googleapis.com
+gcloud services enable containerregistry.googleapis.com
 ```
 
 ## 📈 Performance
@@ -109,6 +155,35 @@ docker run -p 5000:5000 textify
 - **Processing Speed**: 2-5 seconds per summary
 - **Memory Usage**: ~2-4GB (depending on content size)
 - **Supported Input**: Up to 10,000+ words per document
+
+## 🚀 Production Deployment
+
+### Live Application
+Your Textify application is deployed and accessible at:
+- **Cloud Run URL**: Check Google Cloud Console for your service URL
+- **Format**: `https://text-summarizer-bert-[hash]-ew.a.run.app`
+
+### Deployment Configuration
+- **Platform**: Google Cloud Run (Serverless)
+- **Region**: europe-west1
+- **Memory**: 4GB (for T5-Large model)
+- **CPU**: 2 cores
+- **Timeout**: 15 minutes
+- **Auto-scaling**: 0-100 instances based on demand
+
+### Monitoring & Logs
+```bash
+# View service status
+gcloud run services list --platform managed --region europe-west1
+
+# Check logs
+gcloud logs read --service text-summarizer-bert --platform managed --region europe-west1
+
+# Get service URL
+gcloud run services describe text-summarizer-bert \
+  --platform managed --region europe-west1 \
+  --format="value(status.url)"
+```
 
 ## 🤝 Contributing
 

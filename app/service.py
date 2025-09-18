@@ -17,9 +17,23 @@ import datetime
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 
-# Initialize the summarization model globally to avoid repeated loading
-summarizer = pipeline("summarization", model=MODEL_NAME, device=0 if os.getenv('CUDA_AVAILABLE') else -1)
-tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)
+# Global variables for lazy loading
+summarizer = None
+tokenizer = None
+
+def get_summarizer():
+    """Lazy load the summarization model to avoid startup delays."""
+    global summarizer, tokenizer
+    if summarizer is None:
+        logging.info("Loading T5-Large model...")
+        try:
+            summarizer = pipeline("summarization", model=MODEL_NAME, device=-1)  # Force CPU
+            tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)
+            logging.info("T5-Large model loaded successfully")
+        except Exception as e:
+            logging.error(f"Failed to load model: {e}")
+            raise
+    return summarizer, tokenizer
 
 def clean_text_and_generate_wordcloud(file_content):
     """

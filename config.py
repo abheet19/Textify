@@ -1,7 +1,14 @@
 import os
 
+# Application configuration
+SECRET_KEY = os.getenv('SECRET_KEY', 'your_secret_key')
+WORDCLOUD_PATH = 'static/img/wordcloud/'
+
+# Model configuration - Use smaller model for better Cloud Run compatibility
+MODEL_NAME = os.getenv('MODEL_NAME', 't5-base')  # Default to t5-base instead of t5-large
+
 class Config:
-    SECRET_KEY = os.getenv('SECRET_KEY', 'your_secret_key')
+    SECRET_KEY = SECRET_KEY
     DEBUG = False
     TESTING = False
 

@@ -1,11 +1,15 @@
 import multiprocessing
 
-# Gunicorn configuration settings
-bind = "0.0.0.0:8080"  # Updated from 8000 to 8080
-workers = multiprocessing.cpu_count() * 2 + 1  # Number of worker processes
-worker_class = "sync"  # Worker type
-timeout = 120  # Workers silent for more than this many seconds are killed and restarted
-keepalive = 5  # How long to wait for requests on a Keep-Alive connection
+# Gunicorn configuration settings optimized for Cloud Run
+bind = "0.0.0.0:8080"
+workers = 1  # Reduced workers for memory-intensive ML model
+worker_class = "sync"
+timeout = 300  # 5 minutes for worker timeout
+keepalive = 5
+max_requests = 100  # Restart workers after 100 requests to prevent memory leaks
+max_requests_jitter = 10
+preload_app = True  # Load app before forking workers (better for ML models)
+worker_connections = 1000
 
 # Logging configuration - Use stdout/stderr for Cloud Run
 accesslog = '-'  # stdout
