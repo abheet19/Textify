@@ -137,7 +137,7 @@
                                 <input type="file" 
                                        name="name" 
                                        id="file" 
-                                       accept=".pdf,.docx,.txt" 
+                                       accept=".pdf,.docx,.doc,.txt" 
                                        class="custom-file-input" 
                                        required
                                        oninvalid="this.setCustomValidity('Please choose a file')"
@@ -215,6 +215,92 @@
         var fileName = this.files[0].name;
         var nextSibling = this.nextElementSibling;
         nextSibling.innerText = fileName;
+    });
+    
+    // Enhanced file validation and user feedback
+    document.getElementById("upload_form").addEventListener("submit", function(e) {
+        const fileInput = document.getElementById("file");
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            e.preventDefault();
+            alert("Please select a file to upload.");
+            return false;
+        }
+        
+        // Check file size (max 50MB)
+        const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+        if (file.size > maxSize) {
+            e.preventDefault();
+            alert("File is too large. Please select a file smaller than 50MB.");
+            return false;
+        }
+        
+        // Check if file appears to be empty
+        if (file.size < 10) {
+            e.preventDefault();
+            alert("File appears to be empty. Please select a valid file with content.");
+            return false;
+        }
+        
+        // Check file extension
+        const validExtensions = ['.pdf', '.docx', '.doc', '.txt'];
+        const fileName = file.name.toLowerCase();
+        const isValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+        
+        if (!isValidExtension) {
+            e.preventDefault();
+            alert("Please select a valid file type: PDF, Word (.docx/.doc), or Text (.txt)");
+            return false;
+        }
+        
+        // Show loading message
+        const submitBtn = document.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = "Processing...";
+        submitBtn.disabled = true;
+        
+        // Re-enable button after timeout (in case of error)
+        setTimeout(function() {
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+        }, 30000); // 30 seconds timeout
+        
+        return true;
+    });
+    
+    // File input change handler with validation feedback
+    document.getElementById("file").addEventListener("change", function() {
+        const file = this.files[0];
+        const label = this.nextElementSibling;
+        
+        if (file) {
+            let fileName = file.name;
+            const fileSize = (file.size / 1024 / 1024).toFixed(2); // Size in MB
+            
+            // Update label with file info
+            label.innerHTML = `${fileName} <small class="text-muted">(${fileSize} MB)</small>`;
+            
+            // Validate file
+            const validExtensions = ['.pdf', '.docx', '.doc', '.txt'];
+            const isValidExtension = validExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
+            
+            if (!isValidExtension) {
+                label.innerHTML += ' <span class="text-danger">⚠️ Invalid file type</span>';
+                this.setCustomValidity('Please select a PDF, Word, or Text file');
+            } else if (file.size > 50 * 1024 * 1024) {
+                label.innerHTML += ' <span class="text-danger">⚠️ File too large</span>';
+                this.setCustomValidity('File must be smaller than 50MB');
+            } else if (file.size < 10) {
+                label.innerHTML += ' <span class="text-danger">⚠️ File appears empty</span>';
+                this.setCustomValidity('Please select a file with content');
+            } else {
+                label.innerHTML += ' <span class="text-success">✓ Valid file</span>';
+                this.setCustomValidity('');
+            }
+        } else {
+            label.textContent = "Choose file";
+        }
     });
     </script>
 

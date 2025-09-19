@@ -68,6 +68,7 @@ rich==13.9.4
 safetensors==0.5.1
 scikit-learn==1.6.0
 scipy==1.15.0
+sentencepiece==0.2.1
 setuptools==75.1.0
 sgmllib3k==1.0.0
 shellingham==1.5.4

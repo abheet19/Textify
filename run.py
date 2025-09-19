@@ -15,7 +15,13 @@ logger = logging.getLogger(__name__)
 app = create_app()
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
+    # Use different default ports for local development vs production
+    # Cloud Run uses PORT environment variable, local development uses 5000
+    if 'PORT' in os.environ:
+        port = int(os.environ.get('PORT'))  # Cloud Run
+    else:
+        port = 5000  # Local development default
+    
     debug_mode = os.environ.get('FLASK_ENV') == 'development'
     
     logger.info(f"Starting application on port {port}")

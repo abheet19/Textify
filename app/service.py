@@ -25,11 +25,11 @@ def get_summarizer():
     """Lazy load the summarization model to avoid startup delays."""
     global summarizer, tokenizer
     if summarizer is None:
-        logging.info("Loading T5-Large model...")
+        logging.info(f"Loading {MODEL_NAME} model...")
         try:
             summarizer = pipeline("summarization", model=MODEL_NAME, device=-1)  # Force CPU
             tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)
-            logging.info("T5-Large model loaded successfully")
+            logging.info(f"{MODEL_NAME} model loaded successfully")
         except Exception as e:
             logging.error(f"Failed to load model: {e}")
             raise
@@ -86,7 +86,7 @@ def clean_text_and_generate_wordcloud(file_content):
 
 def generate_bert_summary(cleaned_text):
     """
-    Generate an enhanced summary using T5-large model with improved handling for long content.
+    Generate an enhanced summary using T5 model with improved handling for long content.
 
     Args:
         cleaned_text (str): The cleaned input text.
@@ -95,8 +95,16 @@ def generate_bert_summary(cleaned_text):
         str: The generated summary with improved formatting.
     """
     try:
+        # Initialize the model
+        summarizer, tokenizer = get_summarizer()
+        
         if not cleaned_text or len(cleaned_text.strip()) == 0:
             return "No content to summarize."
+        
+        # Ensure cleaned_text is a string
+        if not isinstance(cleaned_text, str):
+            logging.error(f"cleaned_text is not a string: {type(cleaned_text)}")
+            return "Error: Invalid input type."
         
         cleaned_text = re.sub(r'\s+', ' ', cleaned_text.strip())
         
@@ -152,7 +160,8 @@ def generate_bert_summary(cleaned_text):
             
             for i in range(0, len(words), chunk_size - overlap):
                 chunk = ' '.join(words[i:i + chunk_size])
-                chunks.append(chunk)
+                if chunk and len(chunk.strip()) > 0:  # Ensure chunk is not empty
+                    chunks.append(chunk)
                 if i + chunk_size >= len(words):
                     break
             
@@ -160,6 +169,10 @@ def generate_bert_summary(cleaned_text):
             chunk_summaries = []
             for i, chunk in enumerate(chunks[:3]):
                 try:
+                    if not chunk or len(chunk.strip()) == 0:
+                        logging.warning(f"Empty chunk at index {i}, skipping")
+                        continue
+                    
                     input_ids = tokenizer.encode(f"Provide a detailed summary covering all key points and topics mentioned: {chunk}", truncation=True, max_length=512)
                     chunk_text = tokenizer.decode(input_ids, skip_special_tokens=True)
                     
@@ -167,6 +180,7 @@ def generate_bert_summary(cleaned_text):
                     chunk_summary = result[0]["summary_text"]
                     chunk_summaries.append(chunk_summary)
                 except Exception as e:
+                    logging.error(f"Error processing chunk {i}: {e}")
                     continue
             
             if chunk_summaries:
@@ -311,19 +325,33 @@ def generate_bert_summary(cleaned_text):
                     summary = combined_text
             else:
                 # Fallback for no chunk summaries
-                input_ids = tokenizer.encode(cleaned_text, truncation=True, max_length=800)
-                fallback_text = tokenizer.decode(input_ids, skip_special_tokens=True)
-                input_text = f"{summary_style}: {fallback_text}"
-                result = summarizer(input_text, max_new_tokens=final_max_tokens, min_length=final_min_length, do_sample=False)
-                summary = result[0]["summary_text"]
-                summary = summary.replace('. ', '.\n\n').strip()
+                try:
+                    if not cleaned_text or len(cleaned_text.strip()) == 0:
+                        return "Error: No content available for summarization."
+                    
+                    input_ids = tokenizer.encode(cleaned_text, truncation=True, max_length=800)
+                    fallback_text = tokenizer.decode(input_ids, skip_special_tokens=True)
+                    input_text = f"{summary_style}: {fallback_text}"
+                    result = summarizer(input_text, max_new_tokens=final_max_tokens, min_length=final_min_length, do_sample=False)
+                    summary = result[0]["summary_text"]
+                    summary = summary.replace('. ', '.\n\n').strip()
+                except Exception as e:
+                    logging.error(f"Error in fallback summarization: {e}")
+                    return "Error generating summary. Please try again."
         else:
             # For shorter content, use direct summarization
-            input_ids = tokenizer.encode(f"summarize: {cleaned_text}", truncation=True, max_length=512)
-            input_text = tokenizer.decode(input_ids, skip_special_tokens=True)
-            
-            result = summarizer(input_text, max_new_tokens=120, min_length=40, do_sample=False)
-            summary = result[0]["summary_text"]
+            try:
+                if not cleaned_text or len(cleaned_text.strip()) == 0:
+                    return "Error: No content available for summarization."
+                
+                input_ids = tokenizer.encode(f"summarize: {cleaned_text}", truncation=True, max_length=512)
+                input_text = tokenizer.decode(input_ids, skip_special_tokens=True)
+                
+                result = summarizer(input_text, max_new_tokens=120, min_length=40, do_sample=False)
+                summary = result[0]["summary_text"]
+            except Exception as e:
+                logging.error(f"Error in direct summarization: {e}")
+                return "Error generating summary. Please try again."
         
         # Final cleanup
         if '<br>' in summary:
@@ -505,8 +533,10 @@ def generate_pdf_report(summary_text, filename=None):
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"Text_Summary_Report_{timestamp}.pdf"
     
-    pdf_path = os.path.join("downloads", filename)
-    os.makedirs("downloads", exist_ok=True)
+    # Use app's static download directory
+    downloads_dir = os.path.join(os.path.dirname(__file__), 'static', 'download')
+    os.makedirs(downloads_dir, exist_ok=True)
+    pdf_path = os.path.join(downloads_dir, filename)
     
     try:
         pdf = FPDF()
@@ -523,6 +553,7 @@ def generate_pdf_report(summary_text, filename=None):
         
         # Handle HTML formatting in summary
         clean_summary = summary_text.replace('<strong>', '').replace('</strong>', '').replace('<br>', '\n')
+        clean_summary = clean_summary.replace('•', '* ')  # Replace bullet points with asterisks
         
         # Split text into lines to fit PDF width
         lines = clean_summary.split('\n')
@@ -546,7 +577,19 @@ def generate_pdf_report(summary_text, filename=None):
         
     except Exception as e:
         logging.error(f"Error generating PDF: {e}")
-        return None
+        # Create a simple error PDF
+        try:
+            error_pdf_path = os.path.join(downloads_dir, "error_report.pdf")
+            error_pdf = FPDF()
+            error_pdf.add_page()
+            error_pdf.set_font("Arial", size=12)
+            error_pdf.cell(200, 10, txt="Error generating PDF report", ln=True)
+            error_pdf.cell(200, 10, txt="Please try again later", ln=True)
+            error_pdf.output(error_pdf_path)
+            return error_pdf_path
+        except:
+            # If even error PDF fails, return the path anyway
+            return os.path.join(downloads_dir, "error_report.pdf")
 
 def generate_docx_report(summary_text, filename=None):
     """
@@ -563,8 +606,10 @@ def generate_docx_report(summary_text, filename=None):
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"Text_Summary_Report_{timestamp}.docx"
     
-    docx_path = os.path.join("downloads", filename)
-    os.makedirs("downloads", exist_ok=True)
+    # Use app's static download directory
+    downloads_dir = os.path.join(os.path.dirname(__file__), 'static', 'download')
+    os.makedirs(downloads_dir, exist_ok=True)
+    docx_path = os.path.join(downloads_dir, filename)
     
     try:
         doc = Document()
@@ -585,4 +630,14 @@ def generate_docx_report(summary_text, filename=None):
         
     except Exception as e:
         logging.error(f"Error generating DOCX: {e}")
-        return None
+        # Create a simple error DOCX
+        try:
+            error_docx_path = os.path.join(downloads_dir, "error_report.docx")
+            error_doc = Document()
+            error_doc.add_heading('Error Report', 0)
+            error_doc.add_paragraph('Error generating DOCX report. Please try again later.')
+            error_doc.save(error_docx_path)
+            return error_docx_path
+        except:
+            # If even error DOCX fails, return the path anyway
+            return os.path.join(downloads_dir, "error_report.docx")

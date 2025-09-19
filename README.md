@@ -1,10 +1,10 @@
 # Textify: AI-Powered Text Summarizer
 
-A professional text summarization application powered by T5-Large AI model, featuring intelligent content extraction, adaptive summarization, and multi-format export capabilities.
+A professional text summarization application powered by T5 AI model, featuring intelligent content extraction, adaptive summarization, and multi-format export capabilities.
 
 ## 🚀 Features
 
-- **Advanced AI Summarization**: T5-Large transformer model for high-quality text generation
+- **Advanced AI Summarization**: T5 transformer model for high-quality text generation
 - **Smart Content Processing**: Enhanced web scraping with intelligent article detection
 - **Adaptive Formatting**: Dynamic summary structure based on content type and volume
 - **Multi-Format Export**: Professional PDF and DOCX reports with proper formatting
@@ -14,7 +14,7 @@ A professional text summarization application powered by T5-Large AI model, feat
 ## 🛠️ Tech Stack
 
 - **Backend**: Flask, Python 3.8+
-- **AI/ML**: HuggingFace Transformers (T5-Large), WordCloud
+- **AI/ML**: HuggingFace Transformers (T5), WordCloud
 - **Web Scraping**: BeautifulSoup4, Requests
 - **Document Processing**: ReportLab (PDF), python-docx (DOCX)
 - **Frontend**: Bootstrap 4, HTML5/CSS3, JavaScript
@@ -23,7 +23,7 @@ A professional text summarization application powered by T5-Large AI model, feat
 
 ### Prerequisites
 - Python 3.8 or higher
-- 4GB+ RAM (for T5-Large model)
+- 4GB+ RAM (for T5 model)
 - Internet connection (for initial model download)
 
 ### Quick Start
@@ -81,7 +81,7 @@ DEBUG=False
 ```
 
 ### Model Configuration
-The application automatically downloads the T5-Large model on first run. Ensure sufficient disk space (>3GB) and memory (>4GB) for optimal performance.
+The application automatically downloads the T5 model on first run. Ensure sufficient disk space (>3GB) and memory (>4GB) for optimal performance.
 
 ## 🔧 Advanced Features
 
@@ -166,7 +166,7 @@ Your Textify application is deployed and accessible at:
 ### Deployment Configuration
 - **Platform**: Google Cloud Run (Serverless)
 - **Region**: europe-west1
-- **Memory**: 4GB (for T5-Large model)
+- **Memory**: 4GB (for T5 model)
 - **CPU**: 2 cores
 - **Timeout**: 15 minutes
 - **Auto-scaling**: 0-100 instances based on demand
@@ -205,10 +205,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- HuggingFace for the T5-Large model
+- HuggingFace for the T5 model
 - Flask community for excellent documentation
 - Bootstrap for responsive design components
 
 ---
 
-*Built with ❤️ using T5-Large AI and modern web technologies*
+*Built with ❤️ using T5 AI and modern web technologies*
