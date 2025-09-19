@@ -11,6 +11,7 @@ venv/
 env/
 .venv/
 .env/
+.conda/
 
 # Distribution / packaging
 .Python
@@ -112,3 +113,23 @@ logs/
 bert-*/
 .cache/
 huggingface_cache/
+
+# Test files and debug scripts (DO NOT TRACK THESE)
+test_*.py
+*_test.py
+debug_*.py
+analyze_*.py
+enhanced_*.py
+minimal_*.py
+quick_*.py
+simple_*.py
+main.py
+README_new.md
+test_*.html
+test_*.txt
+
+# Backup and temporary files
+*_backup.*
+*_old.*
+*.bak
+*.tmp
