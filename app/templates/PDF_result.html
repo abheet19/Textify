@@ -1,340 +1,57 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "base.html" %}
 
-<head>
-    <meta http-equiv="content-type" content="text/html;charset=UTF-8" />
-    <meta charset="UTF-8">
-    <meta name="description" content="">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+{% block title %}Summary — Textify{% endblock %}
 
-    <!-- Title -->
-    <title>PDF result</title>
+{% block content %}
+<section class="page-head">
+    <div class="container">
+        <span class="eyebrow">Document Summarizer</span>
+        <h1>Your summary is ready</h1>
+        <p>Review it below, or download it as DOCX or PDF.</p>
+    </div>
+</section>
 
-    <!-- Favicon -->
-    <link rel="icon" href="static/img/core-img/favicon.ico">
+<section class="section">
+    <div class="container">
+        <div class="glass-card summary-card">
+            <div class="summary-card-header">
+                <h4><i class="fa fa-file-text-o"></i> AI-Generated Summary</h4>
+                <span class="summary-badge">T5 AI</span>
+            </div>
+            <div class="summary-content" id="summary">{{ summary|safe }}</div>
+            <div class="summary-card-footer">
+                <i class="fa fa-info-circle"></i>
+                Generated using the T5 AI model for optimal accuracy
+            </div>
+        </div>
 
-    <!-- Updated CSS Links -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
-
-</head>
-
-<body class="light-version">
-    <div id="preloader">
-        <div class="preload-content">
-            <div id="dream-load"></div>
+        <div class="btn-row">
+            <form action="{{ url_for('api.download') }}" method="post">
+                <input type="hidden" name="summary" value="{{ summary }}">
+                <button type="submit" class="btn-primary" id="download-docx-btn" disabled>
+                    <i class="fa fa-file-word-o"></i> Download DOCX
+                </button>
+            </form>
+            <form action="{{ url_for('api.download_pdf') }}" method="post">
+                <input type="hidden" name="summary" value="{{ summary }}">
+                <button type="submit" class="btn-primary" id="download-pdf-btn" disabled>
+                    <i class="fa fa-file-pdf-o"></i> Download PDF
+                </button>
+            </form>
         </div>
     </div>
+</section>
+{% endblock %}
 
-    <header class="header-area fadeInDown" data-wow-delay="0.2s">
-        <div class="classy-nav-container light breakpoint-off">
-            <div class="container">
-                <nav class="classy-navbar light justify-content-between" id="dreamNav">
-
-                    <!-- Logo -->
-                    <a class="nav-brand light" href="#"><img src="static/img/self/Background.svg" alt="logo"> By Abheet</a>
-
-                    <div class="classy-navbar-toggler demo">
-                        <span class="navbarToggler"><span></span><span></span><span></span></span>
-                    </div>
-
-                    <div class="classy-menu">
-
-                        <div class="classycloseIcon">
-                            <div class="cross-wrap"><span class="top"></span><span class="bottom"></span></div>
-                        </div>
-
-                        <div class="classynav">
-                            <ul id="nav">
-                                <li><a href="{{ url_for('api.home') }}">Home</a></li>
-                                <li><a href="https://www.linkedin.com/in/abheet-singh-isher-951920175">LinkedIn</a></li>
-                                <li><a href="contact-us.html">About me</a></li>
-                            </ul>
-                        </div>
-                    </div>
-                </nav>
-            </div>
-        </div>
-    </header>
-
-    <div class="breadcumb-area clearfix dzsparallaxer auto-init" data-options='{direction: "normal"}'>
-        <div class="divimage dzsparallaxer--target" style="width: 101%; height: 130%; background-image: url(static/img/bg-img/bg-2.jpg)"></div>
-        <div class="breadcumb-content">
-            <div class="container h-100">
-                <div class="row h-100 align-items-center">
-                    <div class="col-12">
-                        <nav aria-label="breadcrumb" class="breadcumb--con text-center">
-                            <h2 class="w-text title wow fadeInUp" data-wow-delay="0.2s">Summarization using a uploaded file</h2>
-                        </nav>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div style="margin: 30px 0;"></div>
-
-    <section class="section-padding-100 contact_us_area" id="contact">
-        <div class="container">
-            <div class="row">
-                <div class="col-12">
-                    <div class="section-heading text-center">
-                        <div class="dream-dots justify-content-center wow fadeInUp" data-wow-delay="0.2s">
-                            <span>T5 AI Summarizer by ©Abheet</span>
-                        </div>
-                        <h2 class="wow fadeInUp" data-wow-delay="0.3s">Get your Summary here!</h2>
-                        <p class="wow fadeInUp" data-wow-delay="0.4s">You can see the result here or download in DOCX or PDF format</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row justify-content-center">
-                <div class="col-12 col-md-10 col-lg-8">
-                    <div class="contact_form">
-                        <div class="row">
-                            <div class="col-12">
-                                <div id="success_fail_info"></div>
-                            </div>
-
-                            <div class="col-12 col-md-12">
-                                <div class="group wow fadeInUp" data-wow-delay="0.2s">
-                                    <div class="summary-container">
-                                        <div class="summary-header">
-                                            <h4><i class="fa fa-file-text-o"></i> AI-Generated Summary</h4>
-                                            <span class="summary-badge">T5 AI</span>
-                                        </div>
-                                        <div class="summary-content" id="summary">
-                                            {{ summary|safe }}
-                                        </div>
-                                        <div class="summary-footer">
-                                            <span class="summary-info">
-                                                <i class="fa fa-info-circle"></i> 
-                                                Generated using advanced T5 AI model for optimal accuracy
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <span class="highlight"></span>
-                                    <span class="bar"></span>
-                                    <label></label>
-                                </div>
-                            </div>
-                            
-                            <div class="col-12 text-center wow fadeInUp mt-4 mb-5" data-wow-delay="0.6s">
-                                <div class="download-buttons">
-                                    <form action="{{ url_for('api.download') }}" method="post" style="display: inline-block; margin-right: 10px;">
-                                        <input type="hidden" name="summary" value="{{ summary }}">
-                                        <button type="submit" class="btn dream-btn" id="download-docx-btn" disabled>
-                                            <i class="fa fa-file-word-o" aria-hidden="true"></i> Download DOCX
-                                        </button>
-                                    </form>
-                                    <form action="{{ url_for('api.download_pdf') }}" method="post" style="display: inline-block;">
-                                        <input type="hidden" name="summary" value="{{ summary }}">
-                                        <button type="submit" class="btn dream-btn" id="download-pdf-btn" disabled>
-                                            <i class="fa fa-file-pdf-o" aria-hidden="true"></i> Download PDF
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <footer class="footer-area bg-img" >
-        <div class="footer-content-area mt-0">
-            <div class="container">
-                <div class="row ">
-                    <div class="col-12 col-lg-4 col-md-6">
-                        <div class="footer-copywrite-info">
-                            <div class="copywrite_text fadeInUp" data-wow-delay="0.2s">
-                                <div class="footer-logo">
-                                    <a href="#"><img src="static/img/self/Background.svg" alt="logo"> Abheet Singh Isher </a>
-                                </div>
-                                <p>A full-stack software developer experienced in building web applications and data-driven solutions. My portfolio showcases projects utilizing technologies like Python (Flask), JavaScript (React), and cloud services (AWS, Azure). Interested in AI and building efficient, scalable systems.</p>
-                            </div>
-                            <div class="footer-social-info fadeInUp" data-wow-delay="0.4s">
-                                <a href="https://github.com/abheet19"><i class="fa fa-github" aria-hidden="true"></i></a>
-                                <a href="https://www.instagram.com/abheet_singh27/"><i class="fa fa-instagram" aria-hidden="true"></i></a>
-                                <a href="https://www.linkedin.com/in/abheet-singh-isher-951920175"><i class="fa fa-linkedin" aria-hidden="true"></i></a>
-                                <a href="https://api.whatsapp.com/send?phone=919682396948"><i class="fa fa-whatsapp" aria-hidden="true" ></i></a>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-12 col-lg-4 col-md-6">
-                        <div class="contact_info_area d-sm-flex justify-content-between">
-                            <div class="contact_info mt-x text-center fadeInUp" data-wow-delay="0.3s">
-                                <h5>Copyright ©2021 All rights reserved</h5>
-                                
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-12 col-lg-4 col-md-6 ">
-                        <div class="contact_info_area d-sm-flex justify-content-between">
-                            <div class="contact_info mt-s text-center fadeInUp" data-wow-delay="0.4s">
-                                <h5>CONTACT ME</h5>
-                                <p>Karan Nagar</p>
-                                <p>Jammu,Jammu and Kashmir,180001</p>
-                                <p>+91-968-239-6948</p>
-                                <p>abheet19@gmail.com</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-                
-        </div>
-    </footer>
-
-    <script src="static/js/jquery.min.js"></script> <!-- jQuery -->
-    <script src="static/js/popper.min.js"></script> <!-- Popper.js -->
-    <script src="static/js/bootstrap.min.js"></script> <!-- Bootstrap JS -->
-    <script src="static/js/plugins.js"></script> <!-- All Plugins JS -->
-    <script src="static/js/dzsparallaxer.js"></script> <!-- Parallax JS -->
-    <script src="static/js/script.js"></script> <!-- Active JS -->
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const summary = document.getElementById('summary').innerText.trim();
-            const downloadDocxBtn = document.getElementById('download-docx-btn');
-            const downloadPdfBtn = document.getElementById('download-pdf-btn');
-            
-            if (summary.length > 0) {
-                downloadDocxBtn.disabled = false;
-                downloadDocxBtn.classList.remove('disabled');
-                downloadPdfBtn.disabled = false;
-                downloadPdfBtn.classList.remove('disabled');
-            } else {
-                downloadDocxBtn.disabled = true;
-                downloadDocxBtn.classList.add('disabled');
-                downloadPdfBtn.disabled = true;
-                downloadPdfBtn.classList.add('disabled');
-            }
-        });
-    </script>
-
-    <style>
-        .summary-container {
-            background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
-            border: 1px solid #e1e5e9;
-            border-radius: 12px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
-            margin: 30px 0;
-            overflow: hidden;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        
-        .summary-container:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.12);
-        }
-        
-        .summary-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px 25px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .summary-header h4 {
-            margin: 0;
-            font-size: 1.3rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .summary-badge {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            backdrop-filter: blur(10px);
-        }
-        
-        .summary-content {
-            padding: 30px 25px;
-            line-height: 1.8;
-            font-size: 1.1rem;
-            color: #2c3e50;
-            text-align: left;
-            font-family: 'Georgia', 'Times New Roman', serif;
-            background: white;
-            white-space: pre-line;
-        }
-        
-        .summary-content::first-letter {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #667eea;
-            margin-right: 2px;
-        }
-        
-        .summary-footer {
-            background: #f8f9fa;
-            padding: 15px 25px;
-            border-top: 1px solid #e9ecef;
-        }
-        
-        .summary-info {
-            color: #6c757d;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .summary-info i {
-            color: #667eea;
-        }
-        
-        .download-buttons {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-        
-        .download-buttons .btn {
-            min-width: 150px;
-            padding: 12px 20px;
-            font-size: 14px;
-            font-weight: 600;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .download-buttons .btn i {
-            margin-right: 8px;
-        }
-        
-        @media (max-width: 768px) {
-            .download-buttons {
-                flex-direction: column;
-                gap: 10px;
-            }
-            
-            .download-buttons form {
-                width: 100%;
-                margin: 0 !important;
-            }
-            
-            .download-buttons .btn {
-                width: 100%;
-            }
-        }
-    </style>
-
-</body>
-
-</html>
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var summary = document.getElementById('summary').innerText.trim();
+    var downloadDocxBtn = document.getElementById('download-docx-btn');
+    var downloadPdfBtn = document.getElementById('download-pdf-btn');
+    var ready = summary.length > 0;
+    downloadDocxBtn.disabled = !ready;
+    downloadPdfBtn.disabled = !ready;
+});
+</script>
+{% endblock %}

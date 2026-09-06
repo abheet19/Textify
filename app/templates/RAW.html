@@ -1,237 +1,56 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "base.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="description" content="">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+{% block title %}Summarize URL — Textify{% endblock %}
 
-    <!-- Title -->
-    <title>RAW</title>
+{% block content %}
+<section class="page-head">
+    <div class="container">
+        <span class="eyebrow">URL Summarizer</span>
+        <h1>Paste a link to summarize an article</h1>
+        <p>Works with most public article and blog URLs.</p>
+    </div>
+</section>
 
-    <!-- Favicon -->
-    <link rel="icon" href="static/img/core-img/favicon.ico">
-
-    <!-- Core Stylesheet -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-
-    <!-- Responsive Stylesheet -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
-
-</head>
-
-<body class="light-version">
-    <!-- Preloader -->
-    <div id="preloader">
-        <div class="preload-content">
-            <div id="dream-load"></div>
+<section class="section">
+    <div class="container">
+        <div class="glass-card form-card">
+            <form action="{{ url_for('api.RAW_result') }}" method="post" id="url_form" novalidate>
+                <div class="form-group">
+                    <label for="url">Article URL <span class="required">*</span></label>
+                    <input type="url"
+                           name="name"
+                           id="url"
+                           placeholder="https://example.com/article"
+                           required
+                           pattern="https?://.+"
+                           oninvalid="this.setCustomValidity('Please enter a valid URL starting with http:// or https://')"
+                           oninput="this.setCustomValidity('')">
+                </div>
+                <div class="btn-row">
+                    <button type="submit" class="btn-primary">
+                        <i class="fa fa-magic"></i> Summarize
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
+</section>
+{% endblock %}
 
-    <!-- Header Area Start -->
-    <header class="header-area fadeInDown" data-wow-delay="0.2s">
-        <div class="classy-nav-container light breakpoint-off">
-            <div class="container">
-                <!-- Classy Menu -->
-                <nav class="classy-navbar light justify-content-between" id="dreamNav">
-
-                    <!-- Logo -->
-                    <a class="nav-brand light" href="#"><img src="static/img/self/Background.svg" alt="logo"> By
-                        Abheet</a>
-
-                    <!-- Navbar Toggler -->
-                    <div class="classy-navbar-toggler demo">
-                        <span class="navbarToggler"><span></span><span></span><span></span></span>
-                    </div>
-
-                    <!-- Menu -->
-                    <div class="classy-menu">
-
-                        <!-- close btn -->
-                        <div class="classycloseIcon">
-                            <div class="cross-wrap"><span class="top"></span><span class="bottom"></span></div>
-                        </div>
-
-                        <!-- Nav Start -->
-                        <div class="classynav">
-                            <ul id="nav">
-                                <li><a href="{{ url_for('api.home') }}">Home</a></li>
-                                <li><a href="https://www.linkedin.com/in/abheet-singh-isher-951920175">LinkedIn</a></li>
-                                <li><a href="contact-us.html">About me</a></li>
-                            </ul>
-                        </div>
-                        <!-- Nav End -->
-                    </div>
-                </nav>
-            </div>
-        </div>
-    </header>
-    <!-- ##### Header Area End ##### -->
-
-    <!-- ##### Welcome Area Start ##### -->
-    <div class="breadcumb-area clearfix dzsparallaxer auto-init" data-options='{direction: "normal"}'>
-        <div class="divimage dzsparallaxer--target"
-            style="width: 101%; height: 130%; background-image: url(static/img/bg-img/bg-2.jpg)"></div>
-        <!-- breadcumb content -->
-        <div class="breadcumb-content">
-            <div class="container h-100">
-                <div class="row h-100 align-items-center">
-                    <div class="col-12">
-                        <nav aria-label="breadcrumb" class="breadcumb--con text-center">
-                            <h2 class="w-text title wow fadeInUp" data-wow-delay="0.2s">Summarization by scraping a URL link content
-                            </h2>
-                        </nav>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <!-- ##### Welcome Area End ##### -->
-
-    <!-- Add spacing div -->
-    <div style="margin: 30px 0;"></div>
-
-    <!-- ##### Contact Area Start ##### -->
-    <section class="section-padding-100 contact_us_area" id="contact">
-        <div class="container">
-            <div class="row">
-                <div class="col-12">
-                    <div class="section-heading text-center">
-                        <!-- Dream Dots -->
-                        <div class="dream-dots justify-content-center wow fadeInUp" data-wow-delay="0.2s">
-                            <span>Extractive BERT summarizer by ©Abheet</span>
-                        </div>
-                        <h2 class="wow fadeInUp" data-wow-delay="0.3s">Get your Summary here!</h2>
-                        <p class="wow fadeInUp mb-3" data-wow-delay="0.4s">You can see the result here or you can download a DOCX file</p> <!-- Reduced margin-bottom -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Contact Form -->
-            <div class="row justify-content-center">
-                <div class="col-12 col-md-10 col-lg-8">
-                    <div class="contact_form">
-                        <form action="{{ url_for('api.download') }}" method="post" enctype="multipart/form-data"
-                            id="main_contact_form" novalidate>
-                            <div class="row">
-                                <div class="col-12">
-                                    <div id="success_fail_info"></div>
-                                </div>
-
-                                <div class="col-12 col-md-12">
-                                    <div class="group wow fadeInUp" data-wow-delay="0.2s">
-                                        <!-- Display Summary -->
-                                        <div class="justify-content-center text-center"> 
-                                           {{ summary }}
-                                        </div>
-                                        <span class="highlight"></span>
-                                        <span class="bar"></span>
-                                        <label></label>
-                                    </div>
-                                </div>
-
-                                <!-- No Download button present -->
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Move Input Form Below the Specified Paragraph -->
-            <div class="row justify-content-center">
-                <div class="col-md-6">
-                    <form action="{{ url_for('api.RAW_result') }}" method="post" id="url_form" novalidate>
-                        <div class="form-group">
-                            <label for="url">URL: <span class="text-danger">*</span></label>
-                            <input type="url" 
-                                   name="name" 
-                                   id="url" 
-                                   placeholder="https://example.com/article" 
-                                   class="form-control" 
-                                   required
-                                   pattern="https?://.+"
-                                   oninvalid="this.setCustomValidity('Please enter a valid URL starting with http:// or https://')"
-                                   oninput="this.setCustomValidity('')">
-                        </div>
-                        <div class="text-center mt-2"> <!-- Adjusted top margin -->
-                            <button type="submit" class="btn more-btn">Summarize</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-        </div>
-    </section>
-    <!-- ##### Contact Area End ##### -->
-
-    <!-- ##### Footer Area Start ##### -->
-    <footer class="footer-area bg-img">
-        <div class="footer-content-area mt-0">
-            <div class="container">
-                <div class="row">
-                    <div class="col-12 col-lg-4 col-md-6">
-                        <div class="footer-copywrite-info">
-                            <!-- Copywrite -->
-                            <div class="copywrite_text fadeInUp" data-wow-delay="0.2s">
-                                <div class="footer-logo">
-                                    <a href="#"><img src="static/img/self/Background.svg" alt="logo"> Abheet Singh Isher
-                                    </a>
-                                </div>
-                                <p>A full-stack software developer experienced in building web applications and
-                                    data-driven solutions. My portfolio showcases projects utilizing technologies like
-                                    Python (Flask), JavaScript (React), and cloud services (AWS, Azure).
-                                    Interested in AI and building efficient, scalable systems.</p>
-                            </div>
-                            <!-- Social Icon -->
-                            <div class="footer-social-info fadeInUp" data-wow-delay="0.4s">
-                                <a href="https://github.com/abheet19"><i class="fa fa-github"
-                                        aria-hidden="true"></i></a>
-                                <a href="https://www.instagram.com/abheet_singh27/"><i class="fa fa-instagram"
-                                        aria-hidden="true"></i></a>
-                                <a href="https://www.linkedin.com/in/abheet-singh-isher-951920175"><i class="fa fa-linkedin"
-                                        aria-hidden="true"></i></a>
-                                <a href="https://api.whatsapp.com/send?phone=919682396948"><i class="fa fa-whatsapp"
-                                        aria-hidden="true"></i></a>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-12 col-lg-4 col-md-6">
-                        <div class="contact_info_area d-sm-flex justify-content-between">
-                            <!-- Content Info -->
-                            <div class="contact_info mt-x text-center fadeInUp" data-wow-delay="0.3s">
-                                <h5>Copyright ©2021 All rights reserved</h5>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-12 col-lg-4 col-md-6">
-                        <div class="contact_info_area d-sm-flex justify-content-between">
-                            <!-- Content Info -->
-                            <div class="contact_info mt-s text-center fadeInUp" data-wow-delay="0.4s">
-                                <h5>CONTACT ME</h5>
-                                <p>Karan Nagar</p>
-                                <p>Jammu,Jammu and Kashmir,180001</p>
-                                <p>+91-968-239-6948</p>
-                                <p>abheet19@gmail.com</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </footer>
-    <!-- ##### Footer Area End ##### -->
-
-    <!-- ########## All JS ########## -->
-    <script src="static/js/jquery.min.js"></script>
-    <script src="static/js/popper.min.js"></script>
-    <script src="static/js/bootstrap.min.js"></script>
-    <script src="static/js/plugins.js"></script>
-    <script src="static/js/dzsparallaxer.js"></script>
-    <script src="static/js/script.js"></script>
-
-</body>
-
-</html>
+{% block extra_scripts %}
+<script>
+(function () {
+    var form = document.getElementById('url_form');
+    form.addEventListener('submit', function () {
+        var submitBtn = form.querySelector('button[type="submit"]');
+        var originalHtml = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Processing...';
+        submitBtn.disabled = true;
+        setTimeout(function () {
+            submitBtn.innerHTML = originalHtml;
+            submitBtn.disabled = false;
+        }, 30000);
+    });
+})();
+</script>
+{% endblock %}

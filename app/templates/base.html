@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="description" content="{% block description %}Textify — AI-powered text summarization for documents and URLs, using the T5 model.{% endblock %}">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <title>{% block title %}Textify{% endblock %}</title>
+
+    <!-- Google Fonts: Space Grotesk (display), Inter (body), JetBrains Mono (mono) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/font-awesome.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/textify.css') }}">
+
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body>
+    <header class="site-header">
+        <div class="container navbar">
+            <a class="brand" href="{{ url_for('api.home') }}">
+                <span class="brand-mark">T</span>
+                Textify
+            </a>
+            <nav>
+                <ul class="nav-links">
+                    <li><a href="{{ url_for('api.home') }}">Home</a></li>
+                    <li><a href="{{ url_for('api.PDF') }}">Upload Document</a></li>
+                    <li><a href="{{ url_for('api.RAW') }}">Summarize URL</a></li>
+                    <li><a href="https://github.com/abheet19/Text-Summarizer-System_BERT" target="_blank" rel="noopener"><i class="fa fa-github"></i> GitHub</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div>
+                    <div class="footer-brand">
+                        <span class="brand-mark">T</span>
+                        Textify
+                    </div>
+                    <p>AI-powered text summarization for documents and URLs, built on the T5 model.</p>
+                    <div class="social-links">
+                        <a href="https://github.com/abheet19" target="_blank" rel="noopener" aria-label="GitHub"><i class="fa fa-github"></i></a>
+                        <a href="https://www.linkedin.com/in/abheet-singh-isher-951920175" target="_blank" rel="noopener" aria-label="LinkedIn"><i class="fa fa-linkedin"></i></a>
+                        <a href="https://www.instagram.com/abheet_singh27/" target="_blank" rel="noopener" aria-label="Instagram"><i class="fa fa-instagram"></i></a>
+                    </div>
+                </div>
+                <div>
+                    <h5>Product</h5>
+                    <p><a href="{{ url_for('api.PDF') }}">Upload Document</a></p>
+                    <p><a href="{{ url_for('api.RAW') }}">Summarize URL</a></p>
+                </div>
+                <div>
+                    <h5>Contact</h5>
+                    <p>Jammu, J&amp;K, 180001</p>
+                    <p>abheet19@gmail.com</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                &copy; {{ 2021 }}&ndash;2026 Abheet Singh Isher. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+
+</html>

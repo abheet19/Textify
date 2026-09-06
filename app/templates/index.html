@@ -1,177 +1,34 @@
-<!DOCTYPE html>
-<html lang="zxx">
+{% extends "base.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="description" content="Text Summarizer using BERT for extracting summaries from documents and URLs.">
-    <meta http-equiv="content-type" content="text/html;charset=UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+{% block title %}Textify — AI Text Summarizer{% endblock %}
 
-    <title>Text Summarizer</title>
+{% block content %}
+<section class="hero">
+    <div class="container">
+        <span class="eyebrow">T5 · Extractive &amp; Abstractive AI</span>
+        <h1>Turn long documents and articles into clear summaries</h1>
+        <p class="lede">Textify uses the T5 AI model to condense PDFs, Word docs, text files, and web articles into
+            concise, readable summaries — in seconds.</p>
+    </div>
+</section>
 
-    <link rel="icon" href="{{ url_for('static', filename='img/core-img/favicon.ico') }}">
+<section class="section">
+    <div class="container">
+        <div class="card-grid">
+            <a class="glass-card option-card" href="{{ url_for('api.PDF') }}">
+                <div class="option-icon"><i class="fa fa-file-text-o"></i></div>
+                <h3>Upload a document</h3>
+                <p>Summarize a PDF, Word (.docx/.doc), or plain text file straight from your device.</p>
+                <span class="card-link">Upload a file <i class="fa fa-long-arrow-right"></i></span>
+            </a>
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
-
-</head>
-
-<body class="light-version">
-    <div id="preloader">
-        <div class="preload-content">
-            <div id="dream-load"></div>
+            <a class="glass-card option-card" href="{{ url_for('api.RAW') }}">
+                <div class="option-icon"><i class="fa fa-link"></i></div>
+                <h3>Summarize a URL</h3>
+                <p>Paste a link to any article or blog post and get an instant, distilled summary.</p>
+                <span class="card-link">Paste a URL <i class="fa fa-long-arrow-right"></i></span>
+            </a>
         </div>
     </div>
-
-    <header class="header-area fadeInDown" data-wow-delay="0.2s">
-        <div class="classy-nav-container light breakpoint-off">
-            <div class="container">
-                <nav class="classy-navbar light justify-content-between" id="dreamNav">
-
-                    <a class="nav-brand light" href="/"><img src="static/img/self/Background.svg" alt="logo"> By Abheet </a>
-
-                    <div class="classy-navbar-toggler demo">
-                        <span class="navbarToggler"><span></span><span></span><span></span></span>
-                    </div>
-
-                    <div class="classy-menu">
-
-                        <div class="classycloseIcon">
-                            <div class="cross-wrap"><span class="top"></span><span class="bottom"></span></div>
-                        </div>
-
-                        <div class="classynav">
-                            <ul id="nav">
-                                <li><a href="{{ url_for('api.home') }}">Home</a></li>
-                                <li><a href="https://www.linkedin.com/in/abheet-singh-isher-951920175">LinkedIn</a></li>
-                                <li><a href="#footer">About me</a></li>
-                            </ul>
-
-                            <a href="#demo" class="btn login-btn ml-50">Summarize Now</a>
-                        </div>
-                    </div>
-                </nav>
-            </div>
-        </div>
-    </header>
-
-    <section class="hero-section blue-bg relative section-padding" id="home">
-        <div class="hero-section-content">
-            <div class="container h-100">
-                <div class="row h-100 mb-50 align-items-center">
-
-                    <div class="col-12 col-lg-6 col-md-12">
-                        <div class="welcome-content">
-                            <div class="promo-section">
-                                <h3 class="special-head gradient-text cyan">Extractive Text Summarizer</h3>
-                            </div>
-                            <h1 class="w-text wow fadeInUp" data-wow-delay="0.2s">Welcome to the T5 AI-powered intelligent text summarizer</h1>
-                            <p class="g-text wow fadeInUp" data-wow-delay="0.3s">"This advanced NLP web app performs intelligent text summarization on documents and URLs using the powerful T5 generative AI model. It creates comprehensive summaries by understanding context and generating human-like content."</p>
-                            <div class="dream-btn-group wow fadeInUp" data-wow-delay="0.4s">
-                                <a href="#demo" class="btn more-btn mr-3">Summarize now</a>
-                                <a href="https://github.com/abheet19/Text-Summarizer-System_BERT" class="btn more-btn">Github repo</a>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-lg-6 col-md-12">
-                        <img src="static/img/core-img/about.png" alt="Summarizer Image">
-                    </div>
-
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <div class="clearfix"></div>
-
-    <section class="demo section-padding-100-70" id="demo">
-        <div class="container">
-            <div class="section-heading text-center">
-                <div class="dream-dots justify-content-center wow fadeInUp" data-wow-delay="0.2s">
-                    <span class="gradient-text blue">Extractive BERT summarizer by ©Abheet</span>
-                </div>
-                <h2 class="wow fadeInUp" data-wow-delay="0.3s">Pick your choice for summarization</h2>
-                <p class="wow fadeInUp" data-wow-delay="0.4s">You can pass a PDF file or paste a URL link of any article</p>
-            </div>
-            <div class="row justify-content-center">
-
-                <div class="col-lg-4 col-md-6 col-sm-12">
-                    <div class="demo-item">
-                        <a href="{{ url_for('api.PDF') }}" target="_blank"><img src="static/img/self/pdf.jpg" alt="PDF Upload" class="img-responsive"></a>
-                        <div class="preview-btn-wrapper text-center">
-                            <a href="{{ url_for('api.PDF') }}" class="preview-demo" target="_blank">Upload a PDF/ Word/TXT file<i class="fa fa-long-arrow-right"></i></a>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-lg-4 col-md-6 col-sm-12">
-                    <div class="demo-item">
-                        <a href="{{ url_for('api.RAW') }}" target="_blank"><img src="static/img/self/url.jpg" alt="URL Summarization" class="img-responsive"></a>
-                        <div class="preview-btn-wrapper text-center">
-                            <a href="{{ url_for('api.RAW') }}" class="preview-demo" target="_blank">Paste URL <i class="fa fa-long-arrow-right"></i></a>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-    </section>
-
-    <footer class="footer-area bg-img" id="footer">
-        <div class="footer-content-area mt-0">
-            <div class="container">
-                <div class="row ">
-                    <div class="col-12 col-lg-4 col-md-6">
-                        <div class="footer-copywrite-info">
-                            <div class="copywrite_text fadeInUp" data-wow-delay="0.2s">
-                                <div class="footer-logo">
-                                    <a href="#"><img src="static/img/self/Background.svg" alt="logo"> Abheet Singh Isher</a>
-                                </div>
-                                <p>A full-stack software developer experienced in building web applications and data-driven solutions. My portfolio showcases projects utilizing technologies like Python (Flask), JavaScript (React), and cloud services (AWS, Azure). Interested in AI and building efficient, scalable systems.</p>
-                            </div>
-                            <div class="footer-social-info fadeInUp" data-wow-delay="0.4s">
-                                <a href="https://github.com/abheet19"><i class="fa fa-github" aria-hidden="true"></i></a>
-                                <a href="https://www.instagram.com/abheet_singh27/"><i class="fa fa-instagram" aria-hidden="true"></i></a>
-                                <a href="https://www.linkedin.com/in/abheet-singh-isher-951920175"><i class="fa fa-linkedin" aria-hidden="true"></i></a>
-                                <a href="https://api.whatsapp.com/send?phone=919682396948"><i class="fa fa-whatsapp" aria-hidden="true"></i></a>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-12 col-lg-4 col-md-6">
-                        <div class="contact_info_area d-sm-flex justify-content-between">
-                            <div class="contact_info mt-x text-center fadeInUp" data-wow-delay="0.3s">
-                                <h5>&copy; 2021 All rights reserved</h5>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-12 col-lg-4 col-md-6 ">
-                        <div class="contact_info_area d-sm-flex justify-content-between">
-                            <div class="contact_info mt-s text-center fadeInUp" data-wow-delay="0.4s">
-                                <h5>CONTACT ME</h5>
-                                <p>Karan Nagar</p>
-                                <p>Jammu, Jammu and Kashmir, 180001</p>
-                                <p>+91-968-239-6948</p>
-                                <p>abheet19@gmail.com</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <script src="static/js/jquery.min.js"></script>
-        <script src="static/js/popper.min.js"></script>
-        <script src="static/js/bootstrap.min.js"></script>
-        <script src="static/js/plugins.js"></script>
-        <script src="static/js/dzsparallaxer.js"></script>
-        <script src="static/js/jquery.syotimer.min.js"></script>
-        <script src="static/js/script.js"></script>
-    </footer>
-
-</body>
-
-</html>
+</section>
+{% endblock %}

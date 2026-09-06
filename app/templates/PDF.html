@@ -1,309 +1,125 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "base.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="description" content="">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+{% block title %}Upload Document — Textify{% endblock %}
 
-    <!-- Title -->
-    <title>PDF</title>
+{% block content %}
+<section class="page-head">
+    <div class="container">
+        <span class="eyebrow">Document Summarizer</span>
+        <h1>Upload a document to summarize</h1>
+        <p>Supports PDF, Word (.docx/.doc), and plain text files up to 50MB.</p>
+    </div>
+</section>
 
-    <!-- Favicon -->
-    <link rel="icon" href="static/img/core-img/favicon.ico">
-
-    <!-- Core Stylesheet -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-
-    <!-- Responsive Stylesheet -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/responsive.css') }}">
-
-</head>
-
-<body class="light-version">
-    <!-- Preloader -->
-    <div id="preloader">
-        <div class="preload-content">
-            <div id="dream-load"></div>
+<section class="section">
+    <div class="container">
+        <div class="glass-card form-card">
+            <form action="{{ url_for('api.PDF_result') }}" method="post" enctype="multipart/form-data" id="upload_form" novalidate>
+                <div class="form-group">
+                    <label for="file">Choose a file <span class="required">*</span></label>
+                    <div class="dropzone" id="dropzone">
+                        <div class="dropzone-icon"><i class="fa fa-cloud-upload"></i></div>
+                        <div class="dropzone-title">Drag &amp; drop or click to browse</div>
+                        <div class="dropzone-sub">PDF, DOCX, DOC, or TXT — max 50MB</div>
+                        <div class="dropzone-filename" id="file-name"></div>
+                        <input type="file"
+                               name="name"
+                               id="file"
+                               accept=".pdf,.docx,.doc,.txt"
+                               required
+                               oninvalid="this.setCustomValidity('Please choose a file')"
+                               oninput="this.setCustomValidity('')">
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button type="submit" class="btn-primary">
+                        <i class="fa fa-magic"></i> Summarize
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
+</section>
+{% endblock %}
 
-    <!-- Header Area Start -->
-    <header class="header-area fadeInDown" data-wow-delay="0.2s">
-        <div class="classy-nav-container light breakpoint-off">
-            <div class="container">
-                <!-- Classy Menu -->
-                <nav class="classy-navbar light justify-content-between" id="dreamNav">
+{% block extra_scripts %}
+<script>
+(function () {
+    var fileInput = document.getElementById('file');
+    var fileNameEl = document.getElementById('file-name');
+    var dropzone = document.getElementById('dropzone');
+    var form = document.getElementById('upload_form');
+    var validExtensions = ['.pdf', '.docx', '.doc', '.txt'];
+    var maxSize = 50 * 1024 * 1024; // 50MB
 
-                    <!-- Logo -->
-                    <a class="nav-brand light" href="#"><img src="static/img/self/Background.svg" alt="logo"> By Abheet</a>
+    function updateLabel() {
+        var file = fileInput.files[0];
+        if (!file) {
+            fileNameEl.textContent = '';
+            return;
+        }
+        var sizeMb = (file.size / 1024 / 1024).toFixed(2);
+        var nameLower = file.name.toLowerCase();
+        var isValidExt = validExtensions.some(function (ext) { return nameLower.endsWith(ext); });
+        var html = file.name + ' <span class="text-dim">(' + sizeMb + ' MB)</span>';
 
-                    <div class="classy-navbar-toggler demo">
-                        <span class="navbarToggler"><span></span><span></span><span></span></span>
-                    </div>
+        if (!isValidExt) {
+            html += ' <span class="file-warning">&#9888; Invalid file type</span>';
+            fileInput.setCustomValidity('Please select a PDF, Word, or Text file');
+        } else if (file.size > maxSize) {
+            html += ' <span class="file-warning">&#9888; File too large</span>';
+            fileInput.setCustomValidity('File must be smaller than 50MB');
+        } else if (file.size < 10) {
+            html += ' <span class="file-warning">&#9888; File appears empty</span>';
+            fileInput.setCustomValidity('Please select a file with content');
+        } else {
+            html += ' <span class="file-ok">&#10003; Ready to summarize</span>';
+            fileInput.setCustomValidity('');
+        }
+        fileNameEl.innerHTML = html;
+    }
 
-                    <div class="classy-menu">
+    fileInput.addEventListener('change', updateLabel);
+    fileInput.addEventListener('dragover', function () { dropzone.classList.add('dragover'); });
+    fileInput.addEventListener('dragleave', function () { dropzone.classList.remove('dragover'); });
+    fileInput.addEventListener('drop', function () { dropzone.classList.remove('dragover'); });
 
-                        <div class="classycloseIcon">
-                            <div class="cross-wrap"><span class="top"></span><span class="bottom"></span></div>
-                        </div>
-
-                        <div class="classynav">
-                            <ul id="nav">
-                                <li><a href="{{ url_for('api.home') }}">Home</a></li>
-                                <li><a href="https://www.linkedin.com/in/abheet-singh-isher-951920175">LinkedIn</a></li>
-                                <li><a href="contact-us.html">About me</a></li>
-                            </ul>
-
-                            
-                            
-                        </div>
-                    </div>
-                </nav>
-            </div>
-        </div>
-    </header>
-
-    <div class="breadcumb-area clearfix dzsparallaxer auto-init" data-options='{direction: "normal"}'>
-        <div class="divimage dzsparallaxer--target" style="width: 101%; height: 130%; background-image: url(static/img/bg-img/bg-2.jpg)"></div>
-        <div class="breadcumb-content">
-            <div class="container h-100">
-                <div class="row h-100 align-items-center">
-                    <div class="col-12">
-                        <nav aria-label="breadcrumb" class="breadcumb--con text-center">
-                            <h2 class="w-text title wow fadeInUp" data-wow-delay="0.2s">Summarization using a uploaded document</h2>
-                            
-                        </nav>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div style="margin: 10px 0;"></div>
-
-    <section class="section-padding-100 contact_us_area" id="contact" style="padding-bottom: 0;">
-        <div class="container">
-            <div class="row">
-                <div class="col-12">
-                    <div class="section-heading text-center">
-                        <div class="dream-dots justify-content-center wow fadeInUp" data-wow-delay="0.2s">
-                            <span>Extractive BERT summarizer by ©Abheet</span>
-                        </div>
-                        <h2 class="wow fadeInUp" data-wow-delay="0.3s">Get your Summary here!</h2>
-                        <p class="wow fadeInUp mb-3" data-wow-delay="0.4s">You can see the result here or you can download a DOCX file</p> <!-- Reduced margin-bottom -->
-                    </div>
-                </div>
-            </div>
-
-            <div class="row justify-content-center">
-                <div class="col-12 col-md-10 col-lg-8">
-                    <div class="contact_form">
-                        <form action="{{ url_for('api.download') }}" method="post" enctype="multipart/form-data" id="main_contact_form" novalidate>
-                            <div class="row">
-                                <div class="col-12">
-                                    <div id="success_fail_info"></div>
-                                </div>
-
-                                <div class="col-12">
-                                    <div class="group wow fadeInUp" data-wow-delay="0.2s">
-                                        <div class="text-center"> 
-                                            {{ summary }}
-                                        </div>
-                                        <span class="highlight"></span>
-                                        <span class="bar"></span>
-                                        <label></label>
-                                    </div>
-                                </div>
-                                
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section class="upload-section mt-3" style="margin-bottom: 50px;"> <!-- Added margin-bottom -->
-        <div class="container">
-            <h2 class="text-center mb-3">Upload Document for Summarization</h2> <!-- Reduced bottom margin -->
-            <div class="row justify-content-center">
-                <div class="col-md-6">
-                    <form action="{{ url_for('api.PDF_result') }}" method="post" enctype="multipart/form-data" id="upload_form" novalidate>
-                        <div class="form-group">
-                            <label for="file">Choose PDF, Word, or TXT file: <span class="text-danger">*</span></label>
-                            <div class="custom-file">
-                                <input type="file" 
-                                       name="name" 
-                                       id="file" 
-                                       accept=".pdf,.docx,.doc,.txt" 
-                                       class="custom-file-input" 
-                                       required
-                                       oninvalid="this.setCustomValidity('Please choose a file')"
-                                       oninput="this.setCustomValidity('')">
-                                <label class="custom-file-label" for="file">Choose file</label>
-                            </div>
-                        </div>
-                        <div class="text-center mt-2"> <!-- Reduced top margin -->
-                            <button type="submit" class="btn more-btn">Summarize</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <footer class="footer-area bg-img" >
-        <div class="footer-content-area mt-0">
-            <div class="container">
-                <div class="row ">
-                    <div class="col-12 col-lg-4 col-md-6">
-                        <div class="footer-copywrite-info">
-                            <div class="copywrite_text fadeInUp" data-wow-delay="0.2s">
-                                <div class="footer-logo">
-                                    <a href="#"><img src="static/img/self/Background.svg" alt="logo"> Abheet Singh Isher </a>
-                                </div>
-                                <p>A full-stack software developer experienced in building web applications and data-driven solutions. My portfolio showcases projects utilizing technologies like Python (Flask), JavaScript (React), and cloud services (AWS, Azure). Interested in AI and building efficient, scalable systems.</p>
-                            </div>
-                            <div class="footer-social-info fadeInUp" data-wow-delay="0.4s">
-                                <a href="https://github.com/abheet19"><i class="fa fa-github" aria-hidden="true"></i></a>
-                                <a href="https://www.instagram.com/abheet_singh27/"><i class="fa fa-instagram" aria-hidden="true"></i></a>
-                                <a href="https://www.linkedin.com/in/abheet-singh-isher-951920175"><i class="fa fa-linkedin" aria-hidden="true"></i></a>
-                                <a href="https://api.whatsapp.com/send?phone=919682396948"><i class="fa fa-whatsapp" aria-hidden="true" ></i></a>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-12 col-lg-4 col-md-6">
-                        <div class="contact_info_area d-sm-flex justify-content-between">
-                            <div class="contact_info mt-x text-center fadeInUp" data-wow-delay="0.3s">
-                                <h5>Copyright ©2021 All rights reserved</h5>
-                                
-                            </div>
-                        </div>
-                    </div>
-                    
-                    
-
-                    <div class="col-12 col-lg-4 col-md-6 ">
-                        <div class="contact_info_area d-sm-flex justify-content-between">
-                            <div class="contact_info mt-s text-center fadeInUp" data-wow-delay="0.4s">
-                                <h5>CONTACT ME</h5>
-                                <p>Karan Nagar</p>
-                                <p>Jammu,Jammu and Kashmir,180001</p>
-                                <p>+91-968-239-6948</p>
-                                <p>abheet19@gmail.com</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-                
-        </div>
-    </footer>
-
-    <!-- ########## All JS ########## -->
-    <script src="static/js/jquery.min.js"></script>
-    <script src="static/js/popper.min.js"></script>
-    <script src="static/js/bootstrap.min.js"></script>
-    <script src="static/js/plugins.js"></script>
-    <script src="static/js/dzsparallaxer.js"></script>
-    <script src="static/js/script.js"></script>
-    <script>
-    document.getElementById("file").addEventListener("change", function() {
-        var fileName = this.files[0].name;
-        var nextSibling = this.nextElementSibling;
-        nextSibling.innerText = fileName;
-    });
-    
-    // Enhanced file validation and user feedback
-    document.getElementById("upload_form").addEventListener("submit", function(e) {
-        const fileInput = document.getElementById("file");
-        const file = fileInput.files[0];
-        
+    form.addEventListener('submit', function (e) {
+        var file = fileInput.files[0];
         if (!file) {
             e.preventDefault();
-            alert("Please select a file to upload.");
+            alert('Please select a file to upload.');
             return false;
         }
-        
-        // Check file size (max 50MB)
-        const maxSize = 50 * 1024 * 1024; // 50MB in bytes
         if (file.size > maxSize) {
             e.preventDefault();
-            alert("File is too large. Please select a file smaller than 50MB.");
+            alert('File is too large. Please select a file smaller than 50MB.');
             return false;
         }
-        
-        // Check if file appears to be empty
         if (file.size < 10) {
             e.preventDefault();
-            alert("File appears to be empty. Please select a valid file with content.");
+            alert('File appears to be empty. Please select a valid file with content.');
             return false;
         }
-        
-        // Check file extension
-        const validExtensions = ['.pdf', '.docx', '.doc', '.txt'];
-        const fileName = file.name.toLowerCase();
-        const isValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
-        
-        if (!isValidExtension) {
+        var nameLower = file.name.toLowerCase();
+        var isValidExt = validExtensions.some(function (ext) { return nameLower.endsWith(ext); });
+        if (!isValidExt) {
             e.preventDefault();
-            alert("Please select a valid file type: PDF, Word (.docx/.doc), or Text (.txt)");
+            alert('Please select a valid file type: PDF, Word (.docx/.doc), or Text (.txt)');
             return false;
         }
-        
-        // Show loading message
-        const submitBtn = document.querySelector('button[type="submit"]');
-        const originalText = submitBtn.textContent;
-        submitBtn.textContent = "Processing...";
+
+        var submitBtn = form.querySelector('button[type="submit"]');
+        var originalHtml = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Processing...';
         submitBtn.disabled = true;
-        
-        // Re-enable button after timeout (in case of error)
-        setTimeout(function() {
-            submitBtn.textContent = originalText;
+        setTimeout(function () {
+            submitBtn.innerHTML = originalHtml;
             submitBtn.disabled = false;
-        }, 30000); // 30 seconds timeout
-        
+        }, 30000);
+
         return true;
     });
-    
-    // File input change handler with validation feedback
-    document.getElementById("file").addEventListener("change", function() {
-        const file = this.files[0];
-        const label = this.nextElementSibling;
-        
-        if (file) {
-            let fileName = file.name;
-            const fileSize = (file.size / 1024 / 1024).toFixed(2); // Size in MB
-            
-            // Update label with file info
-            label.innerHTML = `${fileName} <small class="text-muted">(${fileSize} MB)</small>`;
-            
-            // Validate file
-            const validExtensions = ['.pdf', '.docx', '.doc', '.txt'];
-            const isValidExtension = validExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
-            
-            if (!isValidExtension) {
-                label.innerHTML += ' <span class="text-danger">⚠️ Invalid file type</span>';
-                this.setCustomValidity('Please select a PDF, Word, or Text file');
-            } else if (file.size > 50 * 1024 * 1024) {
-                label.innerHTML += ' <span class="text-danger">⚠️ File too large</span>';
-                this.setCustomValidity('File must be smaller than 50MB');
-            } else if (file.size < 10) {
-                label.innerHTML += ' <span class="text-danger">⚠️ File appears empty</span>';
-                this.setCustomValidity('Please select a file with content');
-            } else {
-                label.innerHTML += ' <span class="text-success">✓ Valid file</span>';
-                this.setCustomValidity('');
-            }
-        } else {
-            label.textContent = "Choose file";
-        }
-    });
-    </script>
-
-</body>
-
-</html>
+})();
+</script>
+{% endblock %}
