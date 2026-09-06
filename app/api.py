@@ -1,15 +1,8 @@
 """
-API blueprint for the Text Summarizer System.
+API blueprint for Textify.
 
-This module defines optimized routes for handling file uploads, URL submissions,
-summary generation, and file downloads.
-
-OPTIMIZATIONS IMPLEMENTED:
-- Consolidated error handling with standardized handle_error() function
-- Generic process_summary_request() function to reduce code duplication
-- Unified download route supporting both DOCX and PDF formats
-- Removed redundant imports and improved code organization
-- Backward compatibility maintained for existing download routes
+Routes for file uploads, URL submissions, summary generation, and file
+downloads, plus a themed error page shared by all of them.
 """
 
 import os
@@ -36,73 +29,18 @@ api = Blueprint('api', __name__)
 
 def handle_error(error_message, status_code=500):
     """
-    Standardized error handling for API routes.
-    
+    Standardized error handling for API routes. Renders the error inline in
+    Textify's own theme instead of a raw stack trace or an unstyled page.
+
     Args:
         error_message (str): The error message to display
         status_code (int): HTTP status code
-        
+
     Returns:
-        tuple: Error response and status code
+        tuple: Rendered error page and status code
     """
     logging.error(error_message)
-    
-    # Create a user-friendly error page
-    error_html = f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Error - Text Summarizer</title>
-        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-        <style>
-            body {{ background-color: #f8f9fa; }}
-            .error-container {{ 
-                min-height: 100vh; 
-                display: flex; 
-                align-items: center; 
-                justify-content: center; 
-            }}
-            .error-card {{ 
-                max-width: 600px; 
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
-            }}
-            .error-icon {{ 
-                font-size: 4rem; 
-                color: #dc3545; 
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="error-container">
-            <div class="error-card card">
-                <div class="card-body text-center p-5">
-                    <div class="error-icon mb-4">⚠️</div>
-                    <h2 class="card-title text-danger mb-3">File Processing Error</h2>
-                    <p class="card-text lead mb-4">{error_message}</p>
-                    <div class="mb-4">
-                        <h5>What you can try:</h5>
-                        <ul class="text-left">
-                            <li>Make sure your file is not corrupted or empty</li>
-                            <li>For PDF files: Ensure they contain readable text (not just images)</li>
-                            <li>For Word files: Save as .docx format (not .doc)</li>
-                            <li>For text files: Ensure they are properly encoded (UTF-8)</li>
-                            <li>Try uploading a different file</li>
-                        </ul>
-                    </div>
-                    <div>
-                        <a href="/PDF" class="btn btn-primary mr-2">Try Another File</a>
-                        <a href="/" class="btn btn-secondary">Go Home</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-    
-    return error_html, status_code
+    return render_template('error.html', message=error_message), status_code
 
 def process_summary_request(input_data, input_type="file"):
     """
@@ -133,7 +71,15 @@ def process_summary_request(input_data, input_type="file"):
                 
                 cleaned_text = clean_text_and_generate_wordcloud(file_content)
                 summary_text = generate_bert_summary(cleaned_text)
-                
+
+                # generate_bert_summary reports failures as plain strings
+                # ("Error ...", "Text too short ...", "No content ...") rather
+                # than raising - treat those as failures instead of rendering
+                # them as if they were a real summary.
+                if summary_text.startswith(("Error", "Text too short", "No content")):
+                    logging.error(f"Summary generation failed: {summary_text}")
+                    return False, summary_text
+
                 logging.info("Summary generated successfully")
                 return True, summary_text
                 
@@ -152,10 +98,14 @@ def process_summary_request(input_data, input_type="file"):
                 
             logging.info(f"Processing URL: {input_data}")
             summary_text = summarize_url(input_data)
-            
-            if summary_text == "Invalid URL":
-                return False, "Error! Please provide a correct URL - The URL could not be accessed or processed"
-            
+
+            # summarize_url/fetch_article surface failures as strings prefixed
+            # with "Error" (bad URL, fetch failure) or as a "Text too short"
+            # notice from the summarizer - treat both as failures instead of
+            # rendering them as if they were a real summary.
+            if summary_text.startswith("Error") or summary_text.startswith("Text too short"):
+                return False, summary_text
+
             logging.info("URL summary generated successfully")
             return True, summary_text
             
@@ -429,84 +379,6 @@ def PDF():
         Response: The rendered PDF upload page.
     """
     return safe_remove_and_render('PDF.html', render_template)
-
-@api.route('/debug_upload', methods=['POST'])
-def debug_upload():
-    """Debug route to test file upload functionality"""
-    try:
-        logging.info(f"Debug upload - request.files: {request.files}")
-        logging.info(f"Debug upload - request.form: {request.form}")
-        
-        for key, file in request.files.items():
-            logging.info(f"File key: {key}, file: {file}, filename: {getattr(file, 'filename', 'NO_FILENAME')}")
-        
-        uploaded_file = request.files.get('name')
-        if uploaded_file:
-            logging.info(f"File found: {uploaded_file.filename}")
-            
-            # Check file info
-            filename = uploaded_file.filename
-            content_type = getattr(uploaded_file, 'content_type', 'Unknown')
-            
-            # Try to read file data
-            file_data = uploaded_file.read()
-            file_size = len(file_data)
-            
-            # Reset file pointer for processing
-            uploaded_file.seek(0)
-            
-            logging.info(f"File details - Name: {filename}, Size: {file_size} bytes, Content-Type: {content_type}")
-            
-            # Check file header
-            if file_data:
-                header = file_data[:20]
-                logging.info(f"File header: {header}")
-                
-                # Check specific file types
-                if filename.lower().endswith('.pdf'):
-                    is_pdf = file_data.startswith(b'%PDF')
-                    logging.info(f"PDF check - starts with %PDF: {is_pdf}")
-                elif filename.lower().endswith('.docx'):
-                    is_docx = file_data.startswith(b'PK')
-                    logging.info(f"DOCX check - starts with PK (ZIP): {is_docx}")
-            
-            # Try to process the file
-            result = process_file(uploaded_file)
-            return f"Success! File processed: {len(result)} characters extracted"
-        else:
-            return "No file found with key 'name'"
-            
-    except Exception as e:
-        logging.error(f"Debug upload error: {e}")
-        return f"Error: {str(e)}"
-
-@api.route('/test_file_info', methods=['POST'])
-def test_file_info():
-    """Test route to get detailed file information"""
-    try:
-        response = {"files": [], "form_data": dict(request.form)}
-        
-        for key, file in request.files.items():
-            if file:
-                file_data = file.read()
-                file.seek(0)  # Reset for potential reuse
-                
-                file_info = {
-                    "form_key": key,
-                    "filename": file.filename,
-                    "content_type": getattr(file, 'content_type', 'Unknown'),
-                    "size": len(file_data),
-                    "header": file_data[:20].hex() if file_data else "empty",
-                    "is_empty": len(file_data) == 0,
-                    "has_pdf_header": file_data.startswith(b'%PDF') if file_data else False,
-                    "has_zip_header": file_data.startswith(b'PK') if file_data else False
-                }
-                response["files"].append(file_info)
-        
-        return response
-        
-    except Exception as e:
-        return {"error": str(e)}
 
 @api.route('/PDF_result', methods=['GET', 'POST'])
 def PDF_result():

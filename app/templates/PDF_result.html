@@ -26,6 +26,9 @@
         </div>
 
         <div class="btn-row">
+            <button type="button" class="btn-copy" id="copy-btn">
+                <i class="fa fa-clipboard"></i> <span id="copy-btn-label">Copy summary</span>
+            </button>
             <form action="{{ url_for('api.download') }}" method="post">
                 <input type="hidden" name="summary" value="{{ summary }}">
                 <button type="submit" class="btn-primary" id="download-docx-btn" disabled>
@@ -46,12 +49,52 @@
 {% block extra_scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    var summary = document.getElementById('summary').innerText.trim();
+    var summaryEl = document.getElementById('summary');
+    var summary = summaryEl.innerText.trim();
     var downloadDocxBtn = document.getElementById('download-docx-btn');
     var downloadPdfBtn = document.getElementById('download-pdf-btn');
     var ready = summary.length > 0;
     downloadDocxBtn.disabled = !ready;
     downloadPdfBtn.disabled = !ready;
+
+    var copyBtn = document.getElementById('copy-btn');
+    var copyLabel = document.getElementById('copy-btn-label');
+    copyBtn.addEventListener('click', function () {
+        var text = summaryEl.innerText.trim();
+
+        function showCopied() {
+            copyBtn.classList.add('copied');
+            copyLabel.textContent = 'Copied!';
+            setTimeout(function () {
+                copyBtn.classList.remove('copied');
+                copyLabel.textContent = 'Copy summary';
+            }, 2000);
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(showCopied, function () {
+                fallbackCopy(text, showCopied);
+            });
+        } else {
+            fallbackCopy(text, showCopied);
+        }
+    });
+
+    function fallbackCopy(text, onSuccess) {
+        var textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            onSuccess();
+        } catch (e) {
+            /* Clipboard unavailable — nothing to fall back to */
+        }
+        document.body.removeChild(textarea);
+    }
 });
 </script>
 {% endblock %}

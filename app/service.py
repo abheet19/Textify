@@ -11,7 +11,6 @@ from transformers import pipeline, T5Tokenizer
 from fpdf import FPDF
 from docx import Document
 from config import WORDCLOUD_PATH, MODEL_NAME
-import hashlib
 import datetime
 
 # Set up logging

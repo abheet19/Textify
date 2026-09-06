@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Error — Textify{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div class="container">
+        <span class="eyebrow">Something didn't work</span>
+        <h1>We couldn't process that</h1>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <div class="glass-card error-card">
+            <div class="error-card-icon"><i class="fa fa-exclamation-triangle"></i></div>
+            <p class="error-message">{{ message }}</p>
+            <div class="error-tips">
+                <h5>What you can try</h5>
+                <ul>
+                    <li>Make sure your file is not corrupted or empty</li>
+                    <li>For PDFs: ensure they contain readable text, not just scanned images</li>
+                    <li>For Word files: save as <code>.docx</code>, not the older <code>.doc</code></li>
+                    <li>For text files: make sure they're saved as UTF-8</li>
+                    <li>Try a different file, or a different article URL</li>
+                </ul>
+            </div>
+            <div class="btn-row">
+                <a href="{{ url_for('api.PDF') }}" class="btn-primary"><i class="fa fa-upload"></i> Try another file</a>
+                <a href="{{ url_for('api.RAW') }}" class="btn-primary"><i class="fa fa-link"></i> Try a URL instead</a>
+                <a href="{{ url_for('api.home') }}" class="btn-secondary">Go home</a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
