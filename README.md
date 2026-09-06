@@ -155,13 +155,9 @@ wall of text with extra sections bolted underneath.
 
 ## Screenshots
 
-<!-- TODO: replace with real captures — these paths don't exist yet.
-     assets/screenshot-home.png       — landing page, hero + two option cards
-     assets/screenshot-upload.png     — document upload page with the drag-and-drop dropzone
-     assets/screenshot-notes.png      — generated study notes, Summary/Glossary/Quiz tabs
-     assets/screenshot-error.png      — the themed error page for an unsupported file type -->
+Captured live from [the deployed app](https://textify-abheet19.fly.dev/).
 
-_Screenshots pending — see the TODO above for what still needs capturing._
+![Textify — landing page](docs/screenshots/screenshot-1.png)
 
 ## Project structure
 
