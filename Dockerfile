@@ -11,8 +11,15 @@ WORKDIR /app
 
 # Install dependencies
 COPY requirements.txt /app/
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip
+# --no-cache-dir keeps pip's download cache out of the image layers entirely.
+RUN pip install --no-cache-dir -r requirements.txt
+
+# sumy's extractive summarizer uses nltk for sentence tokenization. Download
+# the punkt_tab tokenizer data at build time so it's baked into the image
+# and no network call is needed on first request in production.
+ENV NLTK_DATA=/usr/local/share/nltk_data
+RUN python -m nltk.downloader -d /usr/local/share/nltk_data punkt_tab
 
 # Copy project
 COPY . /app/
@@ -23,6 +30,5 @@ RUN mkdir -p logs downloads static/img/wordcloud
 # Expose the port
 EXPOSE 8080
 
-# Command to run the application - Use Flask directly instead of Gunicorn
-# Command to run the application using Flask directly
-CMD exec python run.py
+# Command to run the application using Gunicorn (production WSGI server)
+CMD exec gunicorn -c gunicorn_config.py run:app

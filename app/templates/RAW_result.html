@@ -1,27 +1,79 @@
 {% extends "base.html" %}
 
-{% block title %}Summary — Textify{% endblock %}
+{% block title %}Study Notes — Textify{% endblock %}
 
 {% block content %}
 <section class="page-head">
     <div class="container">
         <span class="eyebrow">URL Summarizer</span>
-        <h1>Your summary is ready</h1>
-        <p>Review it below, or download it as DOCX or PDF.</p>
+        <h1>Your study notes are ready</h1>
+        <p>A summary, a glossary of key terms, and a few quiz questions — pulled straight from the article.</p>
     </div>
 </section>
 
 <section class="section">
     <div class="container">
-        <div class="glass-card summary-card">
-            <div class="summary-card-header">
-                <h4><i class="fa fa-file-text-o"></i> AI-Generated Summary</h4>
-                <span class="summary-badge">T5 AI</span>
+        <div class="stats-row">
+            <span class="stat-pill"><i class="fa fa-clock-o"></i> <strong>{{ stats.reading_time }}</strong> min read</span>
+            <span class="stat-pill"><i class="fa fa-file-word-o"></i> <strong>{{ stats.word_count }}</strong> words</span>
+            <span class="stat-pill"><i class="fa fa-align-left"></i> <strong>{{ stats.sentence_count }}</strong> sentences</span>
+        </div>
+
+        <div class="tabs" role="tablist">
+            <button type="button" class="tab-btn active" data-tab="summary"><i class="fa fa-file-text-o"></i> <span class="tab-label">Summary</span></button>
+            <button type="button" class="tab-btn" data-tab="glossary"><i class="fa fa-book"></i> <span class="tab-label">Glossary</span> <span class="tab-count">{{ glossary|length }}</span></button>
+            <button type="button" class="tab-btn" data-tab="quiz"><i class="fa fa-question-circle-o"></i> <span class="tab-label">Quiz</span> <span class="tab-count">{{ quiz|length }}</span></button>
+        </div>
+
+        <div class="tab-panel active" data-panel="summary">
+            <div class="glass-card summary-card">
+                <div class="summary-card-header">
+                    <h4><i class="fa fa-file-text-o"></i> Extractive Summary</h4>
+                    <span class="summary-badge">TextRank</span>
+                </div>
+                <div class="summary-content" id="summary">{{ summary }}</div>
+                <div class="summary-card-footer">
+                    <i class="fa fa-info-circle"></i>
+                    The most information-dense sentences from your document, picked by TextRank — no rewriting, no ML model.
+                </div>
             </div>
-            <div class="summary-content" id="summary">{{ summary|safe }}</div>
-            <div class="summary-card-footer">
-                <i class="fa fa-info-circle"></i>
-                Generated using the T5 AI model for optimal accuracy
+        </div>
+
+        <div class="tab-panel" data-panel="glossary">
+            <div class="glass-card">
+                {% if glossary %}
+                <div class="glossary-list">
+                    {% for item in glossary %}
+                    <div class="glossary-item">
+                        <div class="glossary-term"><i class="fa fa-tag"></i> {{ item.term }}</div>
+                        <p class="glossary-context">{{ item.context }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><i class="fa fa-book"></i> No standout terms found in this document.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="tab-panel" data-panel="quiz">
+            <div class="glass-card">
+                {% if quiz %}
+                <div class="quiz-list">
+                    {% for q in quiz %}
+                    <details class="quiz-item">
+                        <summary>
+                            <span class="quiz-badge">{{ "Fill-in-the-blank" if q.type == "blank" else "Q&A" }}</span>
+                            {{ q.question }}
+                            <i class="fa fa-chevron-right quiz-chevron"></i>
+                        </summary>
+                        <div class="quiz-answer">{{ q.answer }}</div>
+                    </details>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><i class="fa fa-question-circle-o"></i> Not enough structured content to generate quiz questions.</div>
+                {% endif %}
             </div>
         </div>
 
@@ -95,6 +147,19 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         document.body.removeChild(textarea);
     }
+
+    // Tabs
+    var tabButtons = document.querySelectorAll('.tab-btn');
+    var panels = document.querySelectorAll('.tab-panel');
+    tabButtons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            tabButtons.forEach(function (b) { b.classList.remove('active'); });
+            panels.forEach(function (p) { p.classList.remove('active'); });
+            btn.classList.add('active');
+            var target = document.querySelector('.tab-panel[data-panel="' + btn.dataset.tab + '"]');
+            if (target) { target.classList.add('active'); }
+        });
+    });
 });
 </script>
 {% endblock %}

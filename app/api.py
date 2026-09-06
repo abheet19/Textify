@@ -11,7 +11,7 @@ from datetime import datetime
 from flask import Blueprint, request, render_template, send_file
 from .service import (
     clean_text_and_generate_wordcloud,
-    generate_bert_summary,
+    generate_study_notes,
     summarize_url,
     generate_pdf_report,
     generate_docx_report
@@ -49,40 +49,42 @@ def process_summary_request(input_data, input_type="file"):
     Args:
         input_data: File object or URL string
         input_type (str): Type of input - "file" or "url"
-        
+
     Returns:
-        tuple: (success, summary_text_or_error_message)
+        tuple: (success, study_notes_dict_or_error_message). study_notes_dict
+        has keys "summary", "glossary", "quiz", "stats" (see
+        service.generate_study_notes).
     """
     try:
         if input_type == "file":
             if not input_data:
                 return False, "Please provide a file - No file was uploaded"
-            
+
             if not input_data.filename or input_data.filename == '':
                 return False, "Please select a file with a valid filename - The uploaded file has no name"
-                
+
             filename = input_data.filename.strip()
             logging.info(f"Processing file upload: {filename}")
-            
+
             # Process file directly from memory (no need to save to disk)
             try:
                 file_content = process_file(input_data)
                 logging.info(f"File processed successfully, content length: {len(file_content)}")
-                
-                cleaned_text = clean_text_and_generate_wordcloud(file_content)
-                summary_text = generate_bert_summary(cleaned_text)
 
-                # generate_bert_summary reports failures as plain strings
+                cleaned_text = clean_text_and_generate_wordcloud(file_content)
+                notes = generate_study_notes(cleaned_text)
+
+                # generate_study_notes reports failures via its "summary" key
                 # ("Error ...", "Text too short ...", "No content ...") rather
                 # than raising - treat those as failures instead of rendering
-                # them as if they were a real summary.
-                if summary_text.startswith(("Error", "Text too short", "No content")):
-                    logging.error(f"Summary generation failed: {summary_text}")
-                    return False, summary_text
+                # them as if they were real study notes.
+                if notes["summary"].startswith(("Error", "Text too short", "No content")):
+                    logging.error(f"Summary generation failed: {notes['summary']}")
+                    return False, notes["summary"]
 
-                logging.info("Summary generated successfully")
-                return True, summary_text
-                
+                logging.info("Study notes generated successfully")
+                return True, notes
+
             except ValueError as e:
                 # These are user-friendly errors from process_file
                 logging.error(f"File processing validation error: {e}")
@@ -91,28 +93,28 @@ def process_summary_request(input_data, input_type="file"):
                 # Unexpected errors
                 logging.error(f"Unexpected file processing error: {e}")
                 return False, f"Unable to process file '{filename}': {str(e)}"
-                
+
         elif input_type == "url":
             if not input_data or not input_data.strip():
                 return False, "Please provide a valid URL"
-                
+
             logging.info(f"Processing URL: {input_data}")
-            summary_text = summarize_url(input_data)
+            notes = summarize_url(input_data)
 
-            # summarize_url/fetch_article surface failures as strings prefixed
-            # with "Error" (bad URL, fetch failure) or as a "Text too short"
-            # notice from the summarizer - treat both as failures instead of
-            # rendering them as if they were a real summary.
-            if summary_text.startswith("Error") or summary_text.startswith("Text too short"):
-                return False, summary_text
+            # summarize_url/fetch_article surface failures via the "summary"
+            # key, prefixed with "Error" (bad URL, fetch failure) or as a
+            # "Text too short" notice from the summarizer - treat both as
+            # failures instead of rendering them as if they were real notes.
+            if notes["summary"].startswith("Error") or notes["summary"].startswith("Text too short"):
+                return False, notes["summary"]
 
-            logging.info("URL summary generated successfully")
-            return True, summary_text
-            
+            logging.info("URL study notes generated successfully")
+            return True, notes
+
     except Exception as e:
         logging.error(f"Unexpected error in process_summary_request: {e}")
         return False, f"An unexpected error occurred while processing your {input_type}: {str(e)}"
-    
+
     return False, f"Unknown {input_type} processing error - Please try again"
 
 def process_file(file_obj):
@@ -399,12 +401,18 @@ def PDF_result():
             logging.info(f"File content type: {getattr(uploaded_file, 'content_type', 'Unknown')}")
         
         success, result = process_summary_request(uploaded_file, "file")
-        
+
         if not success:
             return handle_error(result, 400)
-            
-        return render_template('PDF_result.html', summary=result)
-    
+
+        return render_template(
+            'PDF_result.html',
+            summary=result["summary"],
+            glossary=result["glossary"],
+            quiz=result["quiz"],
+            stats=result["stats"],
+        )
+
     return render_template('PDF.html')
 
 @api.route('/RAW', methods=['GET', 'POST'])
@@ -430,12 +438,18 @@ def RAW_result():
     if request.method == 'POST':
         url = request.form.get('name')
         success, result = process_summary_request(url, "url")
-        
+
         if not success:
             return handle_error(result, 400)
-            
-        return render_template('RAW_result.html', summary=result)
-    
+
+        return render_template(
+            'RAW_result.html',
+            summary=result["summary"],
+            glossary=result["glossary"],
+            quiz=result["quiz"],
+            stats=result["stats"],
+        )
+
     return render_template('RAW.html')
 
 @api.route('/download/<format_type>', methods=['POST'])

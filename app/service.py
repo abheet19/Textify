@@ -7,32 +7,45 @@ import matplotlib.pyplot as plt
 from wordcloud import WordCloud
 from bs4 import BeautifulSoup
 import re
-from transformers import pipeline, T5Tokenizer
+import datetime
+from collections import Counter
+
+from sumy.parsers.plaintext import PlaintextParser
+from sumy.nlp.tokenizers import Tokenizer as SumyTokenizer
+from sumy.summarizers.text_rank import TextRankSummarizer
+from sumy.nlp.stemmers import Stemmer
+from sumy.utils import get_stop_words
+
 from fpdf import FPDF
 from docx import Document
-from config import WORDCLOUD_PATH, MODEL_NAME
-import datetime
+from config import WORDCLOUD_PATH
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 
-# Global variables for lazy loading
-summarizer = None
-tokenizer = None
+SUMY_LANGUAGE = "english"
 
-def get_summarizer():
-    """Lazy load the summarization model to avoid startup delays."""
-    global summarizer, tokenizer
-    if summarizer is None:
-        logging.info(f"Loading {MODEL_NAME} model...")
-        try:
-            summarizer = pipeline("summarization", model=MODEL_NAME, device=-1)  # Force CPU
-            tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)
-            logging.info(f"{MODEL_NAME} model loaded successfully")
-        except Exception as e:
-            logging.error(f"Failed to load model: {e}")
-            raise
-    return summarizer, tokenizer
+# Extra filler words (beyond sumy's own stopword list) that make poor glossary
+# terms even though they're not classic stopwords - narrative/reporting verbs,
+# vague quantifiers, etc.
+EXTRA_STOPWORDS = {
+    "said", "says", "also", "would", "could", "should", "one", "two", "first",
+    "second", "many", "much", "made", "make", "makes", "like", "well", "even",
+    "still", "since", "however", "according", "including", "among", "may",
+    "might", "must", "new", "old", "get", "gets", "got", "going", "goes",
+    "went", "us", "yet", "often", "either", "thus", "therefore", "although",
+}
+GLOSSARY_STOPWORDS = set(get_stop_words(SUMY_LANGUAGE)) | EXTRA_STOPWORDS
+
+# "X is/are/was/were Y" - the classic definition sentence shape. Captured so
+# it can be flipped into a "What is X?" / "X <verb> Y" question-answer pair.
+# The verb is captured (not hardcoded) so the answer stays grammatically
+# consistent with singular/plural and tense in the source sentence.
+DEFINITION_PATTERN = re.compile(
+    r'^(?P<subject>[A-Z][\w\-\'&]*(?:\s+[\w\-\'&]+){0,5}?)\s+'
+    r'(?P<verb>is|are|was|were|refers to|means|denotes)\s+'
+    r'(?P<predicate>(?:a|an|the)\s+.{8,220}|[^,].{8,220})$'
+)
 
 def clean_text_and_generate_wordcloud(file_content):
     """
@@ -83,309 +96,276 @@ def clean_text_and_generate_wordcloud(file_content):
     
     return cleaned_text
 
-def generate_bert_summary(cleaned_text):
+def _split_sentences(text):
+    """Lightweight sentence splitter for the glossary/quiz heuristics (kept
+    separate from sumy's own nltk-backed tokenizer, which is reserved for the
+    summarizer itself)."""
+    return [s.strip() for s in re.split(r'(?<=[.!?])\s+', text) if s.strip()]
+
+
+def generate_summary(cleaned_text):
     """
-    Generate an enhanced summary using T5 model with improved handling for long content.
+    Generate an extractive summary using TextRank (via sumy) - no ML model,
+    no GPU, just graph-based sentence ranking over the document's own
+    sentences. Picks the most information-dense sentences rather than
+    writing new ones.
 
     Args:
         cleaned_text (str): The cleaned input text.
 
     Returns:
-        str: The generated summary with improved formatting.
+        str: The extracted summary sentences, one per line.
     """
     try:
-        # Initialize the model
-        summarizer, tokenizer = get_summarizer()
-        
-        if not cleaned_text or len(cleaned_text.strip()) == 0:
+        if not cleaned_text or not isinstance(cleaned_text, str) or not cleaned_text.strip():
             return "No content to summarize."
-        
-        # Ensure cleaned_text is a string
-        if not isinstance(cleaned_text, str):
-            logging.error(f"cleaned_text is not a string: {type(cleaned_text)}")
-            return "Error: Invalid input type."
-        
-        cleaned_text = re.sub(r'\s+', ' ', cleaned_text.strip())
-        
-        if len(cleaned_text.split()) < 30:
+
+        text = re.sub(r'\s+', ' ', cleaned_text.strip())
+        word_count = len(text.split())
+
+        if word_count < 30:
             return "Text too short for summarization. Please provide more content."
-        
-        words = cleaned_text.split()
-        
-        if len(words) > 800:
-            # Count articles for adaptive summarization
-            news_story_count = cleaned_text.count('NEWS STORY:')
-            headline_count = cleaned_text.count('HEADLINE:')
-            article_markers = news_story_count + headline_count
-            
-            paragraphs = [p.strip() for p in cleaned_text.split('\n\n') if len(p.strip()) > 30]
-            lines_with_content = [line.strip() for line in cleaned_text.split('\n') if len(line.strip()) > 50]
-            
-            # Enhanced article detection for India Today
-            if 'indiatoday' in cleaned_text.lower() or len(lines_with_content) > 10:
-                article_count = max(
-                    article_markers,
-                    len(paragraphs),
-                    len(lines_with_content) // 2,
-                    15
-                )
-            else:
-                article_count = max(article_markers, len(paragraphs) // 3, 1)
-            
-            # Adaptive parameters based on article count
-            if article_count >= 8:
-                max_tokens_per_chunk = 150
-                min_length_per_chunk = 60
-                final_max_tokens = 500
-                final_min_length = 300
-                summary_style = "Create a detailed news summary organized by topics with clear headings. Group related stories under categories like 'Asia Cup:', 'International News:', 'Domestic News:', 'Business:', etc. Use bullet points and subheadings for clarity"
-            elif article_count >= 4:
-                max_tokens_per_chunk = 120
-                min_length_per_chunk = 50
-                final_max_tokens = 350
-                final_min_length = 200
-                summary_style = "Create a structured news summary with topic headings. Group similar stories together under clear categories"
-            else:
-                max_tokens_per_chunk = 80
-                min_length_per_chunk = 30
-                final_max_tokens = 200
-                final_min_length = 80
-                summary_style = "Create a concise summary covering the key news topics mentioned"
-            
-            # Smart chunking strategy
-            chunks = []
-            chunk_size = 400
-            overlap = 50
-            
-            for i in range(0, len(words), chunk_size - overlap):
-                chunk = ' '.join(words[i:i + chunk_size])
-                if chunk and len(chunk.strip()) > 0:  # Ensure chunk is not empty
-                    chunks.append(chunk)
-                if i + chunk_size >= len(words):
-                    break
-            
-            # Summarize each chunk
-            chunk_summaries = []
-            for i, chunk in enumerate(chunks[:3]):
-                try:
-                    if not chunk or len(chunk.strip()) == 0:
-                        logging.warning(f"Empty chunk at index {i}, skipping")
-                        continue
-                    
-                    input_ids = tokenizer.encode(f"Provide a detailed summary covering all key points and topics mentioned: {chunk}", truncation=True, max_length=512)
-                    chunk_text = tokenizer.decode(input_ids, skip_special_tokens=True)
-                    
-                    result = summarizer(chunk_text, max_new_tokens=max_tokens_per_chunk, min_length=min_length_per_chunk, do_sample=False)
-                    chunk_summary = result[0]["summary_text"]
-                    chunk_summaries.append(chunk_summary)
-                except Exception as e:
-                    logging.error(f"Error processing chunk {i}: {e}")
-                    continue
-            
-            if chunk_summaries:
-                combined_text = '\n\n'.join(chunk_summaries)
-                
-                if len(combined_text.split()) > 80:
-                    try:
-                        final_input = f"{summary_style}: {combined_text}"
-                        result = summarizer(final_input, max_new_tokens=final_max_tokens, min_length=final_min_length, do_sample=False)
-                        summary = result[0]["summary_text"]
-                        
-                        # Clean up prompt leakage
-                        if summary.startswith(summary_style.split(':')[0]):
-                            summary = summary[len(summary_style.split(':')[0]):].strip()
-                        if summary.startswith(":"):
-                            summary = summary[1:].strip()
-                        
-                        # Remove garbled text
-                        summary = re.sub(r'[­\-–—]{2,}', '', summary)
-                        summary = re.sub(r'\.{3,}', '.', summary)
-                        summary = re.sub(r'\s[a-z]\s', ' ', summary)
-                        summary = re.sub(r'^[^A-Z]*', '', summary)
-                        summary = re.sub(r'\s+', ' ', summary)
-                        
-                        # Enhanced structure formatting for ALL summary sizes
-                        if article_count >= 8:
-                            # Extract meaningful sentences
-                            sentences = []
-                            for s in summary.split('.'):
-                                s = s.strip()
-                                if len(s) > 15 and any(c.isalpha() for c in s):
-                                    if not s.endswith('.'):
-                                        s += '.'
-                                    sentences.append(s)
-                            
-                            if len(sentences) >= 3:
-                                structured_summary = ""
-                                
-                                # Categorize sentences by keywords
-                                sports_keywords = ['cricket', 'cup', 'match', 'player', 'team', 'sport', 'asia cup', 'pakistan cricket', 'batting', 'bowling', 'wicket', 'runs', 'tournament']
-                                international_keywords = ['russia', 'nato', 'foreign ministry', 'pressure', 'oil', 'moscow', 'us', 'united states', 'ties with india', 'international relations']
-                                crime_keywords = ['killed', 'murder', 'lover', 'husband', 'dumping body', 'crime', 'police', 'arrested', 'victim', 'criminal']
-                                domestic_keywords = ['nepal', 'president', 'minister', 'government', 'cabinet', 'domestic policy', 'national']
-                                
-                                sports_sentences = []
-                                international_sentences = []
-                                crime_sentences = []
-                                domestic_sentences = []
-                                other_sentences = []
-                                
-                                for sentence in sentences:
-                                    sentence_lower = sentence.lower()
-                                    sentence = re.sub(r'[­\-–—]{2,}', '', sentence)
-                                    sentence = re.sub(r'\s+', ' ', sentence).strip()
-                                    
-                                    if len(sentence) > 15:
-                                        if any(keyword in sentence_lower for keyword in crime_keywords):
-                                            crime_sentences.append(sentence)
-                                        elif any(keyword in sentence_lower for keyword in sports_keywords) and ('cricket' in sentence_lower or 'cup' in sentence_lower or 'match' in sentence_lower):
-                                            sports_sentences.append(sentence)
-                                        elif any(keyword in sentence_lower for keyword in international_keywords):
-                                            international_sentences.append(sentence)
-                                        elif any(keyword in sentence_lower for keyword in domestic_keywords):
-                                            domestic_sentences.append(sentence)
-                                        else:
-                                            other_sentences.append(sentence)
-                                
-                                # Build structured output with HTML formatting
-                                if sports_sentences:
-                                    structured_summary += "<strong>Sports & Asia Cup:</strong><br>"
-                                    for sentence in sports_sentences[:3]:
-                                        structured_summary += f"• {sentence}<br>"
-                                    structured_summary += "<br>"
-                                
-                                if international_sentences:
-                                    structured_summary += "<strong>International News:</strong><br>"
-                                    for sentence in international_sentences[:3]:
-                                        structured_summary += f"• {sentence}<br>"
-                                    structured_summary += "<br>"
-                                
-                                if crime_sentences:
-                                    structured_summary += "<strong>Crime & Security:</strong><br>"
-                                    for sentence in crime_sentences[:3]:
-                                        structured_summary += f"• {sentence}<br>"
-                                    structured_summary += "<br>"
-                                
-                                if domestic_sentences:
-                                    structured_summary += "<strong>Domestic News:</strong><br>"
-                                    for sentence in domestic_sentences[:3]:
-                                        structured_summary += f"• {sentence}<br>"
-                                    structured_summary += "<br>"
-                                
-                                if other_sentences:
-                                    structured_summary += "<strong>Other News:</strong><br>"
-                                    for sentence in other_sentences[:2]:
-                                        structured_summary += f"• {sentence}<br>"
-                                
-                                summary = structured_summary.strip()
-                            else:
-                                summary = re.sub(r'[­\-–—\.]{2,}', '', summary)
-                                summary = re.sub(r'\s+', ' ', summary).strip()
-                        
-                        elif article_count >= 4:
-                            # Create paragraph breaks for medium summaries
-                            if '. ' in summary:
-                                sentences = [s.strip() for s in summary.split('. ') if s.strip() and len(s.strip()) > 10]
-                                if len(sentences) >= 2:
-                                    paragraphs = []
-                                    sentences_per_para = max(1, len(sentences) // 3)
-                                    
-                                    for i in range(0, len(sentences), sentences_per_para):
-                                        para_sentences = sentences[i:i + sentences_per_para]
-                                        para = '. '.join(para_sentences)
-                                        if not para.endswith('.'):
-                                            para += '.'
-                                        paragraphs.append(para)
-                                    
-                                    summary = '<br><br>'.join(paragraphs)
-                                    
-                        else:
-                            # Ensure at least 2 paragraphs for small summaries
-                            if '. ' in summary:
-                                sentences = [s.strip() for s in summary.split('. ') if s.strip() and len(s.strip()) > 10]
-                                if len(sentences) >= 2:
-                                    mid_point = len(sentences) // 2
-                                    para1 = '. '.join(sentences[:mid_point])
-                                    para2 = '. '.join(sentences[mid_point:])
-                                    
-                                    if not para1.endswith('.'):
-                                        para1 += '.'
-                                    if not para2.endswith('.'):
-                                        para2 += '.'
-                                    
-                                    summary = f"{para1}<br><br>{para2}"
-                                    
-                            summary = re.sub(r'[­\-–—\.]{2,}', '', summary)
-                            summary = re.sub(r'\s+', ' ', summary).strip()
-                        
-                    except:
-                        summary = combined_text.replace('. ', '.\n\n').strip()
-                else:
-                    summary = combined_text
-            else:
-                # Fallback for no chunk summaries
-                try:
-                    if not cleaned_text or len(cleaned_text.strip()) == 0:
-                        return "Error: No content available for summarization."
-                    
-                    input_ids = tokenizer.encode(cleaned_text, truncation=True, max_length=800)
-                    fallback_text = tokenizer.decode(input_ids, skip_special_tokens=True)
-                    input_text = f"{summary_style}: {fallback_text}"
-                    result = summarizer(input_text, max_new_tokens=final_max_tokens, min_length=final_min_length, do_sample=False)
-                    summary = result[0]["summary_text"]
-                    summary = summary.replace('. ', '.\n\n').strip()
-                except Exception as e:
-                    logging.error(f"Error in fallback summarization: {e}")
-                    return "Error generating summary. Please try again."
-        else:
-            # For shorter content, use direct summarization
-            try:
-                if not cleaned_text or len(cleaned_text.strip()) == 0:
-                    return "Error: No content available for summarization."
-                
-                input_ids = tokenizer.encode(f"summarize: {cleaned_text}", truncation=True, max_length=512)
-                input_text = tokenizer.decode(input_ids, skip_special_tokens=True)
-                
-                result = summarizer(input_text, max_new_tokens=120, min_length=40, do_sample=False)
-                summary = result[0]["summary_text"]
-            except Exception as e:
-                logging.error(f"Error in direct summarization: {e}")
-                return "Error generating summary. Please try again."
-        
-        # Final cleanup
-        if '<br>' in summary:
-            lines = summary.split('<br>')
-        else:
-            lines = summary.split('\n')
-        
-        clean_lines = []
-        for line in lines:
-            line = line.strip()
-            line = re.sub(r'enen\s*-en\s*en-ena\s*aen.*', '', line)
-            line = re.sub(r'it says\s*[­\-–—\.a\s]*', '', line)
-            line = re.sub(r'[­\-–—]{2,}', '', line)
-            line = re.sub(r'\.{3,}', '.', line)
-            line = re.sub(r'\s+', ' ', line).strip()
-            
-            if (len(line) > 3 and 
-                not re.match(r'^[^a-zA-Z]*$', line) and
-                not re.search(r'^[a-z\s\.\-–—]*$', line) and
-                'enen' not in line and
-                len([c for c in line if c.isalpha()]) > 3):
-                clean_lines.append(line)
-        
-        if '<br>' in summary:
-            summary = '<br>'.join(clean_lines)
-        else:
-            summary = '\n'.join(clean_lines)
-        
-        summary = summary.strip()
-        
-        return summary
-        
+
+        # Adaptive sentence count - roughly one summary sentence per ~40
+        # source words, bounded to keep short pieces tight and long pieces
+        # from turning into a second copy of the document.
+        sentence_count = max(3, min(12, word_count // 40))
+
+        parser = PlaintextParser.from_string(text, SumyTokenizer(SUMY_LANGUAGE))
+        stemmer = Stemmer(SUMY_LANGUAGE)
+        summarizer = TextRankSummarizer(stemmer)
+        summarizer.stop_words = get_stop_words(SUMY_LANGUAGE)
+
+        ranked_sentences = summarizer(parser.document, sentence_count)
+
+        if not ranked_sentences:
+            return "Error generating summary. Please try again."
+
+        return "\n\n".join(str(s) for s in ranked_sentences)
+
     except Exception as e:
         logging.error(f"Error generating summary: {e}")
         return "Error generating summary. Please try again."
+
+
+def extract_glossary(cleaned_text, max_terms=12):
+    """
+    Extract a glossary of key terms using simple, explainable heuristics -
+    no ML model. Proper-noun phrases (consecutive capitalized words) that
+    recur across the text are the strongest signal; frequent, sufficiently
+    long lowercase words fill in the rest. Each term is paired with a source
+    sentence that mentions it, for context.
+
+    Args:
+        cleaned_text (str): The cleaned input text.
+        max_terms (int): Maximum number of glossary entries to return.
+
+    Returns:
+        list[dict]: [{"term": str, "context": str}, ...]
+    """
+    if not cleaned_text or not cleaned_text.strip():
+        return []
+
+    text = cleaned_text.strip()
+    sentences = _split_sentences(text)
+
+    # Proper-noun phrases: 1-3 consecutive capitalized words, not counting
+    # the first word of a sentence (which is capitalized regardless).
+    candidates = Counter()
+    for sentence in sentences:
+        words = sentence.split(' ')
+        for i, word in enumerate(words):
+            if i == 0:
+                continue
+            stripped = re.sub(r"[^A-Za-z\-']", '', word)
+            if not stripped or not stripped[0].isupper():
+                continue
+            phrase_words = [stripped]
+            j = i + 1
+            while j < len(words) and len(phrase_words) < 3:
+                nxt = re.sub(r"[^A-Za-z\-']", '', words[j])
+                if nxt and nxt[0].isupper():
+                    phrase_words.append(nxt)
+                    j += 1
+                else:
+                    break
+            phrase = ' '.join(phrase_words)
+            if phrase.lower() not in GLOSSARY_STOPWORDS and len(phrase) > 2:
+                candidates[phrase] += 1
+
+    proper_nouns = [term for term, count in candidates.most_common(max_terms * 2) if count >= 2]
+
+    terms = list(proper_nouns)
+
+    if len(terms) < max_terms:
+        raw_words = re.findall(r"[A-Za-z][A-Za-z\-']{4,}", text)
+        freq = Counter(
+            w.lower() for w in raw_words
+            if w.lower() not in GLOSSARY_STOPWORDS
+        )
+        existing_lower = {t.lower() for t in terms}
+        for word, _count in freq.most_common(max_terms * 3):
+            if word in existing_lower:
+                continue
+            terms.append(word)
+            existing_lower.add(word)
+            if len(terms) >= max_terms:
+                break
+
+    terms = terms[:max_terms]
+
+    glossary = []
+    for term in terms:
+        term_pattern = re.compile(re.escape(term), re.IGNORECASE)
+        context = None
+        for sentence in sentences:
+            if term_pattern.search(sentence) and len(sentence.split()) <= 45:
+                context = sentence
+                break
+        glossary.append({
+            "term": term if term[:1].isupper() or ' ' in term else term.capitalize(),
+            "context": context or "Key term appearing in the source text.",
+        })
+
+    return glossary
+
+
+def generate_quiz(cleaned_text, glossary=None, max_questions=6):
+    """
+    Generate quiz questions from the source text using two honest, non-ML
+    techniques:
+
+    1. Definition-shaped sentences ("X is Y") become a "What is X?" /
+       "X is Y" question-answer pair.
+    2. Sentences containing a glossary term become fill-in-the-blank
+       questions, with the term blanked out.
+
+    Args:
+        cleaned_text (str): The cleaned input text.
+        glossary (list[dict] | None): Glossary entries from extract_glossary,
+            reused so blanks target terms already identified as important.
+        max_questions (int): Maximum number of questions to return.
+
+    Returns:
+        list[dict]: [{"type": "qa"|"blank", "question": str, "answer": str}, ...]
+    """
+    if not cleaned_text or not cleaned_text.strip():
+        return []
+
+    sentences = [s for s in _split_sentences(cleaned_text) if 6 <= len(s.split()) <= 45]
+    questions = []
+    used = set()
+
+    # 1. Definition sentences -> "What is X?" Q&A
+    seen_subjects = set()
+    for sentence in sentences:
+        if len(questions) >= max_questions:
+            break
+        if sentence in used:
+            continue
+        match = DEFINITION_PATTERN.match(sentence)
+        if not match:
+            continue
+        subject = match.group("subject").strip()
+        verb = match.group("verb")
+        predicate = match.group("predicate").strip().rstrip('.')
+        if not subject or len(subject.split()) > 6:
+            continue
+        if subject.lower() in seen_subjects:
+            continue
+        questions.append({
+            "type": "qa",
+            "question": f"What {'is' if verb in ('is', 'was') else 'are'} {subject}?",
+            "answer": f"{subject} {verb} {predicate}.",
+        })
+        used.add(sentence)
+        seen_subjects.add(subject.lower())
+
+    # 2. Fill-in-the-blank using glossary terms
+    terms = [g["term"] for g in (glossary or [])]
+    for sentence in sentences:
+        if len(questions) >= max_questions:
+            break
+        if sentence in used:
+            continue
+        for term in terms:
+            pattern = re.compile(r'\b' + re.escape(term) + r'\b', re.IGNORECASE)
+            if pattern.search(sentence):
+                blanked, count = pattern.subn('_____', sentence, count=1)
+                if count:
+                    questions.append({
+                        "type": "blank",
+                        "question": blanked,
+                        "answer": term,
+                    })
+                    used.add(sentence)
+                    break
+
+    return questions[:max_questions]
+
+
+def compute_stats(cleaned_text):
+    """
+    Compute basic reading stats for the source text.
+
+    Args:
+        cleaned_text (str): The cleaned input text.
+
+    Returns:
+        dict: {"word_count": int, "sentence_count": int, "reading_time": int}
+        reading_time is in whole minutes, assuming ~200 words/minute.
+    """
+    if not cleaned_text or not cleaned_text.strip():
+        return {"word_count": 0, "sentence_count": 0, "reading_time": 0}
+
+    words = cleaned_text.split()
+    word_count = len(words)
+    sentence_count = len(_split_sentences(cleaned_text))
+    reading_time = max(1, round(word_count / 200))
+
+    return {
+        "word_count": word_count,
+        "sentence_count": sentence_count,
+        "reading_time": reading_time,
+    }
+
+
+def generate_study_notes(cleaned_text):
+    """
+    Build the full set of study notes from cleaned source text: an
+    extractive summary, a glossary of key terms, a handful of quiz
+    questions, and reading stats. This is the single entry point the API
+    layer should call for both file uploads and URL summaries.
+
+    Args:
+        cleaned_text (str): The cleaned input text.
+
+    Returns:
+        dict: {"summary": str, "glossary": list[dict], "quiz": list[dict],
+               "stats": dict}. On failure, "summary" carries an
+               "Error"/"Text too short"/"No content" message (matching the
+               old contract) and glossary/quiz/stats are empty.
+    """
+    summary = generate_summary(cleaned_text)
+
+    if summary.startswith(("Error", "Text too short", "No content")):
+        return {
+            "summary": summary,
+            "glossary": [],
+            "quiz": [],
+            "stats": {"word_count": 0, "sentence_count": 0, "reading_time": 0},
+        }
+
+    glossary = extract_glossary(cleaned_text)
+    quiz = generate_quiz(cleaned_text, glossary=glossary)
+    stats = compute_stats(cleaned_text)
+
+    return {
+        "summary": summary,
+        "glossary": glossary,
+        "quiz": quiz,
+        "stats": stats,
+    }
 
 def fetch_article(url):
     """
@@ -491,31 +471,37 @@ def fetch_article(url):
 
 def summarize_url(url):
     """
-    Main function to summarize content from a URL.
-    
+    Main function to generate study notes from a URL's article content.
+
     Args:
         url (str): The URL to summarize.
-        
+
     Returns:
-        str: The summary of the URL content.
+        dict: A generate_study_notes() result. On fetch failure, "summary"
+        carries an "Error: ..." message and glossary/quiz/stats are empty.
     """
     try:
         article_text = fetch_article(url)
-        
+
         if article_text.startswith("Error"):
-            return article_text
-        
+            return {
+                "summary": article_text,
+                "glossary": [],
+                "quiz": [],
+                "stats": {"word_count": 0, "sentence_count": 0, "reading_time": 0},
+            }
+
         cleaned_text = clean_text_and_generate_wordcloud(article_text)
-        
-        summary_text = generate_bert_summary(cleaned_text)
-        
-        if summary_text.startswith("Error") or summary_text.startswith("Text too short"):
-            return summary_text
-        
-        return summary_text
+
+        return generate_study_notes(cleaned_text)
     except Exception as e:
         logging.error(f"Error summarizing URL: {e}")
-        return f"Error processing URL: {e}"
+        return {
+            "summary": f"Error processing URL: {e}",
+            "glossary": [],
+            "quiz": [],
+            "stats": {"word_count": 0, "sentence_count": 0, "reading_time": 0},
+        }
 
 def generate_pdf_report(summary_text, filename=None):
     """
