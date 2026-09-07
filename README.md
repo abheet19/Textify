@@ -26,6 +26,12 @@ free-tier VM.
 
 <br>
 
+<img src="docs/demo/textify-demo.gif" width="900" alt="Textify demo: a document is uploaded, and the Summary, Glossary and Quiz tabs fill with study notes generated from it">
+
+<sub>One 600-word document in — a TextRank summary, a 12-term glossary, and 6 quiz questions out, across three tabs. Recorded end to end against the live app.</sub>
+
+<br>
+
 </div>
 
 > [!NOTE]
@@ -158,6 +164,25 @@ wall of text with extra sections bolted underneath.
 Captured live from [the deployed app](https://textify-abheet19.fly.dev/).
 
 ![Textify — landing page](docs/screenshots/screenshot-1.png)
+
+### Regenerating the demo GIF
+
+The GIF at the top of this README is a real Playwright recording of the deployed app, not a
+mockup. Playwright is a recording-time tool and deliberately isn't a dependency of the Flask
+app, so it's installed in a throwaway directory outside the repo:
+
+```bash
+mkdir /tmp/pw && cd /tmp/pw
+npm init -y && npm i playwright && npx playwright install chromium
+
+# capture PNG frames from the live app (set TEXTIFY_URL to record a local run)
+node /path/to/Textify/tools/record-demo.mjs
+
+# assemble them into the GIF committed under docs/demo/
+python /path/to/Textify/tools/build-demo-gif.py frames        /path/to/Textify/docs/demo/textify-demo.gif
+```
+
+The source document the demo feeds in lives at `tools/demo-assets/antikythera-mechanism.txt`.
 
 ## Project structure
 
