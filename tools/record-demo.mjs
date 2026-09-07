@@ -95,7 +95,7 @@ async function main() {
   // --- 3. Choose a real document ------------------------------------------
   await page.setInputFiles('#file', DOC);
   await page.waitForTimeout(300);
-  await hold(page, 14); // hold on "Ready to summarize"
+  await hold(page, 11); // hold on "Ready to summarize"
 
   // --- 4. Run it (real server-side TextRank; the wait is cut, not faked) ----
   await Promise.all([
@@ -106,7 +106,7 @@ async function main() {
   await page.waitForTimeout(500);
 
   // --- 5. Summary tab ------------------------------------------------------
-  await hold(page, 16);
+  await hold(page, 11);
   await scrollTo(page, 320, 6);
   await hold(page, 10);
   await scrollTo(page, 0, 4);
@@ -114,7 +114,7 @@ async function main() {
   // --- 6. Glossary tab -----------------------------------------------------
   await page.locator('.tab-btn[data-tab="glossary"]').click();
   await page.waitForTimeout(350);
-  await hold(page, 14);
+  await hold(page, 11);
   await scrollTo(page, 300, 6);
   await hold(page, 10);
   await scrollTo(page, 0, 4);
@@ -122,17 +122,17 @@ async function main() {
   // --- 7. Quiz tab, with an answer actually revealed -----------------------
   await page.locator('.tab-btn[data-tab="quiz"]').click();
   await page.waitForTimeout(350);
-  await hold(page, 12);
+  await hold(page, 11);
   await scrollTo(page, 150, 4);
 
   const questions = page.locator('.quiz-item');
   await questions.nth(0).locator('summary').click();
   await page.waitForTimeout(250);
-  await hold(page, 14);
+  await hold(page, 11);
 
   await questions.nth(1).locator('summary').click();
   await page.waitForTimeout(250);
-  await hold(page, 18);
+  await hold(page, 11);
 
   // --- 8. Land back on Summary so the loop closes where it opened ----------
   await questions.nth(0).locator('summary').click();

@@ -20,6 +20,7 @@ from PIL import Image
 WIDTH = 960          # GitHub renders README images at roughly 850px wide
 FRAME_MS = 125       # 8fps - plenty for UI, and a third the frames of 24fps
 COLORS = 128         # palette size; the copper/amber dark theme needs few
+MAX_HOLD_MS = 1500   # no single beat gets to freeze past this
 
 
 def main() -> int:
@@ -40,9 +41,14 @@ def main() -> int:
         digest = img.tobytes()
 
         # Collapse runs of identical frames into one longer frame instead of
-        # paying for duplicate image data.
+        # paying for duplicate image data — capped at MAX_HOLD_MS so a long
+        # static run still reads as a beat, not a freeze. Once the fold hits
+        # the cap the rest of the run is dropped outright rather than kept as
+        # a second identical frame: Pillow's GIF `optimize` pass re-merges
+        # byte-identical adjacent frames on save anyway, which would silently
+        # undo a deliberate split back into one long hold.
         if digest == previous:
-            durations[-1] += FRAME_MS
+            durations[-1] = min(MAX_HOLD_MS, durations[-1] + FRAME_MS)
             continue
         previous = digest
         frames.append(img.quantize(colors=COLORS, method=Image.MEDIANCUT))
