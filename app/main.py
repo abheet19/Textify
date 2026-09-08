@@ -289,4 +289,3 @@ def delete_document(document_id: str, request: Request):
 @app.get("/")
 def home():
     return FileResponse(Path(__file__).parent / "web" / "index.html")
-

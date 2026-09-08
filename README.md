@@ -12,7 +12,15 @@ Private study notes → relevant passages → a concise, cited answer.
 
 </div>
 
+![Textify live upload, question and cited-evidence workflow](docs/demo/textify-demo.gif)
+
+<details><summary>Current live workspace screenshot</summary>
+
 ![Textify private workspace](docs/demo/textify-private-workspace.png)
+
+</details>
+
+The short edited capture uses the actual deployed workspace and a synthetic release-notes document. Its answer came from Claude and its retrieval used local BGE vectors; the test source was removed afterwards.
 
 Textify turns a PDF, DOCX, or TXT study source into a **single-user, citation-first retrieval workspace**. It indexes a document into semantic chunks, retrieves the most relevant passages for a question, and returns the answer alongside its source excerpts. Use it when you need to find an answer inside your own notes and check the evidence yourself. The workspace is private; unlock it with your access code.
 

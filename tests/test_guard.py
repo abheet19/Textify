@@ -42,5 +42,3 @@ def test_request_budget_refuses_the_next_paid_operation():
 
     assert error.value.status_code == 429
     assert error.value.headers["Retry-After"]
-
-

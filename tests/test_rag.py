@@ -22,4 +22,3 @@ def test_answer_budget_is_bounded():
 def test_fingerprint_is_deterministic_and_content_sensitive():
     assert source_fingerprint("same document") == source_fingerprint("same document")
     assert source_fingerprint("same document") != source_fingerprint("other document")
-
