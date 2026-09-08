@@ -133,3 +133,8 @@ test_*.txt
 *_old.*
 *.bak
 *.tmp
+.neon
+
+# Local tooling created by Neon CLI / Codex; not part of the Python service.
+node_modules/
+.agents/
