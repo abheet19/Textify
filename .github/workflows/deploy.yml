@@ -1,45 +1,10 @@
-name: Deploy to Google Cloud
-
+name: Legacy GCP deployment retired
 on:
-  push:
-    branches:
-      - main  # Changed from master to main
-
+  workflow_dispatch:
+permissions:
+  contents: read
 jobs:
-  build-and-deploy:
+  migration-note:
     runs-on: ubuntu-latest
-
     steps:
-      # Step 1: Checkout the repository code
-      - name: Checkout Code
-        uses: actions/checkout@v3  # Updated from v2 to v3
-
-      # Step 2: Set up Google Cloud SDK
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1.4.0
-        with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          export_default_credentials: true
-
-      # Step 3: Build and Push Docker Image using Cloud Build
-      - name: Build and Push Docker Image
-        run: |
-          gcloud builds submit --config ./cloudbuild.yaml --region europe-west1  # Changed region to europe-west1
-
-      # Step 4: Deploy the Docker Image to Google Cloud Run
-      - name: Deploy to Cloud Run
-        run: |
-          gcloud run deploy text-summarizer-bert \
-            --image gcr.io/text-summarizer-bert/text-summarizer-bert:${{ secrets.SHORT_SHA }} \
-            --platform managed \
-            --region europe-west1 \
-            --allow-unauthenticated
-
-      # Step 5: Set IAM Policy to allow all users to invoke the service
-      - name: Set IAM Policy for Cloud Run Service
-        run: |
-          gcloud beta run services add-iam-policy-binding text-summarizer-bert \
-            --region europe-west1 \
-            --member=allUsers \
-            --role=roles/run.invoker
+      - run: echo 'Textify uses the existing textify-abheet19 Fly app. Use the verified Fly deployment workflow; this legacy GCP job intentionally makes no cloud changes.'

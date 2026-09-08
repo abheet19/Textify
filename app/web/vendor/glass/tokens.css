@@ -1,0 +1,390 @@
+/* =============================================================================
+   GLASS — tokens.css
+   The core grammar. Every other file in this package consumes it; none extends it.
+
+   WHAT THIS IS. Eight of my projects converged on the same surface without ever
+   sharing a stylesheet. Weft and Vantage arrived at byte-identical glass values,
+   the same --r-1/2/3, the same --t-fast/base/slow over cubic-bezier(.2,.8,.2,1),
+   the same three-way theme triad and the same accessibility fallback block —
+   differing only in accent hue. Zeno arrived independently at a colour law where
+   every value carries its measured contrast ratio inline and a script fails the
+   build if it drifts. This file is those two findings, merged, once.
+
+   THE ONE IDEA. A theme owns hue. The system owns everything else.
+
+     Structure  — the lightness ladder, radii, the type scale, motion, spacing,
+                  the glass geometry, and the four state hues.  DEFINED HERE.
+     Hue        — nine numbers per theme: the ground's hue and chroma, and the
+                  hue plus a per-ground chroma for each of the two accents.
+                  DEFINED IN src/themes/*.css, AND NOWHERE ELSE.
+
+   A theme therefore cannot alter structure, because it is handed no structural
+   token to alter. It is not a convention that a theme "should not" change the
+   radius scale; it has no radius token in scope. The ladder is identical across
+   all eight themes by construction, and scripts/contrast.mjs asserts it anyway.
+
+   WHY THE LIGHTNESS IS NOT THE BRAND'S. Each theme's source hex — the colour on
+   its brand mark — sets the hue and the chroma ceiling. It does NOT set the
+   lightness, because lightness is what contrast is made of. #C81E33 is a
+   beautiful crimson and, as body text on this system's --raised plane, it
+   measures 3.2:1 — below AA. So the hex gives the hue and the law gives the L.
+   Every source hex is recorded in its theme file, in a comment, as the origin.
+
+   OKLCH, NOT HEX. Perceptually uniform: one lightness number means the same
+   apparent lightness at every hue, which is the only reason a single ladder can
+   be shared by a crimson, a teal and an emerald and land in the same place.
+   Weft and Vantage were already there; this file finishes the move.
+
+   THE CEILINGS, MEASURED NOT ASSERTED. Every ratio quoted in this file is
+   printed by `node scripts/contrast.mjs`, for all eight themes on both grounds,
+   and CI fails on any regression. The numbers in these comments are the worst
+   case across the eight, not a favourable one.
+
+     4.5:1  body text                 WCAG 2.2 SC 1.4.3
+     3.0:1  graphics and UI controls  WCAG 2.2 SC 1.4.11
+
+   Verified by: node scripts/contrast.mjs
+   ============================================================================= */
+
+/* =============================================================================
+   1. THE DARK GROUND — the bare :root.
+
+   Dark-first, as Weft and Vantage both are. The manual light override and the
+   system-light block follow in §7; both must win in their own direction, and
+   both set color-scheme so form controls and scrollbars follow.
+   ============================================================================= */
+
+:root {
+  color-scheme: dark;
+
+  /* ---------------------------------------------------------------------------
+     1.1 THE SEEDS — the only tokens a theme is allowed to set.
+
+     The values here are Zeno's, so tokens.css alone renders a complete, correct
+     surface with no theme file loaded. Load src/themes/<name>.css and set
+     data-glass="<name>" on <html> to rotate the hue; nothing else moves.
+
+     --c-*-lt is the light-ground chroma. It is a separate number from the dark
+     one for one unglamorous reason: sRGB is not a cylinder. The most saturated
+     in-gamut crimson at L 78% carries C 0.125; at L 50% it carries C 0.195. One
+     chroma for both grounds would mean either an out-of-gamut dark accent that
+     the browser silently clips, or a light accent duller than it needs to be.
+     --------------------------------------------------------------------------- */
+  --h-ground: 359.8;  --c-ground: 0.0088;
+  --h-accent: 22.2;   --c-accent: 0.125;    --c-accent-lt: 0.195;
+  --h-accent-2: 32.5; --c-accent-2: 0.178;  --c-accent-2-lt: 0.163;
+
+  /* ---------------------------------------------------------------------------
+     1.2 GROUND AND SURFACES — four planes, one hue, a fixed lightness ladder.
+
+       --bg       the page. Never pure black: an OLED-black ground makes every
+                  glass edge read as a seam.
+       --surface  the working plane. Opaque. Long-form text lives here.
+       --raised   panels and cards lifted off the surface. The LIGHTEST opaque
+                  plane text may land on, and therefore the worst case that
+                  every text ceiling in this file is measured against.
+       --line     hairline separators. Decorative — exempt from 1.4.11, and
+                  never the only thing carrying a boundary that matters.
+     --------------------------------------------------------------------------- */
+  --bg:      oklch(14% var(--c-ground) var(--h-ground));
+  --surface: oklch(19% var(--c-ground) var(--h-ground));
+  --raised:  oklch(24% var(--c-ground) var(--h-ground));
+  --line:    oklch(31% var(--c-ground) var(--h-ground));
+
+  /* ---------------------------------------------------------------------------
+     1.3 INK — three roles, three different ceilings. Read them.
+
+       --ink    body text. Clears every plane and the worst glass (8.83:1 on
+                glass, 14.19:1 on --raised). Deliberately warm — hue 90, not the
+                ground's — so white text never reads blue-shifted against a cool
+                ground. The ink belongs to the system, not to the theme.
+       --ink-2  secondary text. Clears every opaque plane AND glass (4.44:1 was
+                the measurement at Weft's 74%; lifted one point to 75% so it
+                clears 4.5 on glass too, rather than declaring an exclusion
+                nobody would remember).
+       --ink-3  NOT A TEXT COLOUR. Watermarks, disabled affordances, hairline
+                glyphs — 3:1 graphic threshold, on OPAQUE PLANES ONLY (3.83:1 on
+                --raised). On glass it measures 2.39:1 and is forbidden;
+                contrast.mjs asserts that exclusion is real rather than folklore.
+     --------------------------------------------------------------------------- */
+  --ink:   oklch(95% 0.007 90);
+  --ink-2: oklch(75% 0.010 var(--h-ground));
+  --ink-3: oklch(58% 0.012 var(--h-ground));
+
+  /* ---------------------------------------------------------------------------
+     1.4 ACCENT — two, and only two. The brand's whole vocabulary.
+
+       --accent    the primary. Text-safe everywhere, glass included
+                   (4.85:1 worst on glass, 7.78:1 worst on --raised).
+       --accent-2  the secondary. Text-safe on OPAQUE PLANES (5.92:1 worst on
+                   --raised); on glass it is graphic only (3.69:1 worst) — a
+                   mark, an edge, a bar, never a sentence.
+       --on-accent the ink that sits ON a filled accent. Dark on the dark ground
+                   because both accents are light there (9.17:1 worst).
+     --------------------------------------------------------------------------- */
+  --accent:    oklch(78% var(--c-accent) var(--h-accent));
+  --accent-2:  oklch(71% var(--c-accent-2) var(--h-accent-2));
+  --on-accent: oklch(16% var(--c-ground) var(--h-ground));
+
+  /* ---------------------------------------------------------------------------
+     1.5 THE FOUR STATES — shared by every theme, on purpose.
+
+     A theme rotates its accent. It does not get to rebrand "this failed". Green
+     means the same thing in the emerald theme and the crimson one, and a user
+     who learns the vocabulary in one product keeps it in the next.
+
+     Text on opaque planes (5.73:1 worst, --bad); graphic on glass (3.57:1
+     worst, --bad). A state on glass chrome is a .state chip, which brings its
+     own opaque fill — see primitives.css §6.
+
+     THE FOUR LIGHTNESSES ARE DELIBERATELY SPREAD, and that came out of the
+     budget rather than out of taste. Weft and Vantage both ship these four at
+     L 76/80/70/76, which clears every contrast ceiling — and then collapses:
+     mixed into a chip fill, --ok, --warn and --info land within 0.0009 of each
+     other in greyscale luminance. Printed in black and white, or seen by a
+     deuteranope, three of the four statuses become the same chip. The hues are
+     the flagships'; only the L moved, until the four fills ladder.
+     --------------------------------------------------------------------------- */
+  --ok:   oklch(78% 0.15 150);
+  --warn: oklch(85% 0.12 75);
+  --bad:  oklch(70% 0.17 25);
+  --info: oklch(72% 0.12 240);
+
+  /* ---------------------------------------------------------------------------
+     1.6 GLASS — the material, verbatim in spirit from Weft and Vantage, whose
+     values were already byte-identical to each other before this package
+     existed. Only --gl-fill and --gl-inner take the theme's hue; the edge, the
+     specular and the blur are neutral and structural.
+
+       --gl-fill    the tint. Semi-transparent by definition.
+       --gl-edge    the 1px border that makes the pane an object.
+       --gl-spec    the specular top edge — the light catching the lip.
+       --gl-blur    backdrop-filter. Blur plus a saturation lift, so what shows
+                    through reads as refracted rather than smeared.
+       --gl-shadow  the specular inset and the cast, as one shorthand.
+       --gl-inner   the >=60%-alpha inner fill a text label sits on INSIDE glass
+                    (Weft's addition, kept: a label on bare glass is unmeasurable
+                    because glass has no fixed luminance).
+     --------------------------------------------------------------------------- */
+  --gl-fill:   oklch(20% var(--c-ground) var(--h-ground) / .55);
+  --gl-edge:   oklch(100% 0 0 / .12);
+  --gl-spec:   oklch(100% 0 0 / .30);
+  --gl-blur:   blur(14px) saturate(1.4);
+  --gl-shadow: inset 0 1px 0 var(--gl-spec), 0 10px 30px -12px oklch(0% 0 0 / .6);
+  --gl-inner:  oklch(17% var(--c-ground) var(--h-ground) / .68);
+
+  /* --gl-worst is NOT A PAINT COLOUR. Nothing is ever filled with it.
+
+     Glass has no fixed luminance — it is whatever is behind it, blurred. So a
+     ceiling measured "on glass" is meaningless unless the worst realistic case
+     is written down. This is that case: the tint's white at the strength the
+     ambient ground can lift it to, over --line, the lightest neutral glass may
+     sit above. It exists so the budget can MEASURE text on glass instead of
+     guessing at it. Zeno's --gl-worst, generalised to eight themes. */
+  --gl-worst: color-mix(in srgb, oklch(100% 0 0) 8%, var(--line));
+
+  /* ---------------------------------------------------------------------------
+     1.7 FOCUS — a real 2px border, offset 2px. There is deliberately no focus
+     GLOW token here; a glow is not a focus indicator, it is a mood.
+
+     The ring is the accent, which is already proven text-safe on every plane
+     and on glass, so it clears the 3:1 non-text threshold with room to spare.
+     One fewer colour to verify, and a focus ring that is obviously the brand's.
+     --------------------------------------------------------------------------- */
+  --focus:     var(--accent);
+  --focus-w:   2px;
+  --focus-off: 2px;
+
+  /* ---------------------------------------------------------------------------
+     1.8 TYPE — two faces and a clamp scale, from Weft and Vantage.
+
+     Both stacks end in a system family, and no @font-face and no @import
+     appears anywhere in this package. Nothing here reaches the network. If
+     Geist is not installed the surface is still complete, just less particular.
+     --------------------------------------------------------------------------- */
+  --font-ui:   "Geist", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  --fs-0: clamp(.78rem, .76rem + .10vw, .85rem);   /* meta, chips, table cells */
+  --fs-1: clamp(.90rem, .86rem + .20vw, 1.00rem);  /* body */
+  --fs-2: clamp(1.10rem, 1.00rem + .40vw, 1.30rem);/* panel and section titles */
+  --fs-3: clamp(1.6rem, 1.25rem + 1.3vw, 2.5rem);  /* display. Beyond the three
+                                                      the flagships name, added
+                                                      because both invented one
+                                                      locally anyway. */
+  --lh-1: 1.2;   /* headings, chips */
+  --lh-2: 1.45;  /* dense lists, code */
+  --lh-3: 1.6;   /* prose */
+
+  /* 1.9 RADII — three, plus the pill. Nothing off-scale.
+       --r-1 chips, inputs, small controls · --r-2 cards and opaque planes
+       --r-3 glass panes and overlays      · --r-pill fully round */
+  --r-1: 8px;
+  --r-2: 12px;
+  --r-3: 16px;
+  --r-pill: 999px;
+
+  /* 1.10 MOTION — three durations and one curve, identical in Weft and Vantage
+     before this file existed. Killed entirely under reduced motion (§8). */
+  --t-fast: 120ms;
+  --t-base: 220ms;
+  --t-slow: 400ms;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+
+  /* 1.11 SPACING — a 4px scale. Not part of the grammar the flagships share
+     (each had its own ad-hoc spacing); added here because primitives.css needs
+     one and eight projects should not each invent it again. */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-7: 32px; --sp-8: 48px;
+
+  /* WCAG 2.2 SC 2.5.8 — minimum interactive target. */
+  --target-min: 24px;
+
+  /* 1.12 Z-INDEX SCALE — one shared stacking order for the overlay components
+     in src/feedback.css and src/navigation.css. Structural, not colour: no
+     token here paints anything, so contrast.mjs has nothing to assert about
+     this block. The gaps (100 apart) are room to insert a layer later without
+     renumbering every one above it. */
+  --z-dropdown: 300;
+  --z-tooltip:  400;
+  --z-toast:    500;
+  --z-modal:    600;
+}
+
+/* =============================================================================
+   2. THE LIGHT GROUND — applied twice so both directions of the switch win.
+
+     :root[data-theme="light"]                 the explicit toggle, beats a dark
+                                               system preference
+     @media (prefers-color-scheme: light)
+       :root:not([data-theme="dark"])          the system preference, unless an
+                                               explicit dark toggle overrides it
+
+   The two blocks are identical by construction; change one, change both.
+   contrast.mjs compares them declaration by declaration and fails if they drift,
+   which is the only reason it is safe to write the same thing twice.
+
+   WHAT CHANGES, AND WHY IT IS NOT A MIRROR. The ladder inverts (the working
+   plane becomes the BRIGHTEST thing, not the darkest) and the accents drop from
+   L 78%/71% to L 50%/45%, because the same colour cannot clear 4.5:1 against
+   both a 24% plane and a 96% one. That is the whole reason a "light mode" that
+   only swaps two greys looks broken.
+   ============================================================================= */
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* --surface is the brightest plane here, and --raised sits BELOW --bg: a
+     raised card on a light ground reads as raised by being slightly recessed in
+     tone and lifted by shadow, not by getting brighter than the paper.
+     --raised is therefore still the worst-case text backdrop, at 96%. */
+  --bg:      oklch(97% 0.006 var(--h-ground));
+  --surface: oklch(99.5% 0.003 var(--h-ground));
+  --raised:  oklch(96% 0.006 var(--h-ground));
+  --line:    oklch(88% 0.008 var(--h-ground));
+
+  /* --ink 16.07:1 on --raised · --ink-2 7.19:1 on the worst glass
+     --ink-3 3.79:1 on --raised — still not a text colour, on either ground. */
+  --ink:   oklch(20% 0.02 var(--h-ground));
+  --ink-2: oklch(42% 0.015 var(--h-ground));
+  --ink-3: oklch(58% 0.015 var(--h-ground));
+
+  /* accent 4.64:1 on --raised, 4.45:1 on the worst glass at L 52% — so L 50%,
+     which lands at 4.94:1 / 4.74:1 worst across the eight themes.
+     accent-2 6.30:1 on --raised; graphic only on glass, same law as dark. */
+  --accent:    oklch(50% var(--c-accent-lt) var(--h-accent));
+  --accent-2:  oklch(45% var(--c-accent-2-lt) var(--h-accent-2));
+  --on-accent: oklch(99% 0.005 var(--h-ground));
+
+  /* The states drop with everything else. --warn is the one that matters:
+     Vantage ships oklch(60% 0.15 75) on its light ground, which measures
+     3.59:1 as text — below AA. It is 53% here, and contrast.mjs is the reason
+     that was found rather than shipped. */
+  --ok:   oklch(52% 0.14 150);
+  --warn: oklch(53% 0.11 75);
+  --bad:  oklch(55% 0.19 25);
+  --info: oklch(52% 0.118 240);
+
+  /* Glass inverts: on a light ground the tint LIGHTENS what is behind it, so
+     the worst case inverts too — the tint over --line rather than over it. */
+  --gl-fill:   oklch(100% 0 0 / .55);
+  --gl-edge:   oklch(20% 0.02 var(--h-ground) / .10);
+  --gl-spec:   oklch(100% 0 0 / .9);
+  --gl-shadow: inset 0 1px 0 var(--gl-spec), 0 10px 30px -12px oklch(0% 0 0 / .18);
+  --gl-inner:  oklch(100% 0 0 / .74);
+  --gl-worst:  color-mix(in srgb, oklch(100% 0 0) 55%, var(--line));
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+
+    --bg:      oklch(97% 0.006 var(--h-ground));
+    --surface: oklch(99.5% 0.003 var(--h-ground));
+    --raised:  oklch(96% 0.006 var(--h-ground));
+    --line:    oklch(88% 0.008 var(--h-ground));
+
+    --ink:   oklch(20% 0.02 var(--h-ground));
+    --ink-2: oklch(42% 0.015 var(--h-ground));
+    --ink-3: oklch(58% 0.015 var(--h-ground));
+
+    --accent:    oklch(50% var(--c-accent-lt) var(--h-accent));
+    --accent-2:  oklch(45% var(--c-accent-2-lt) var(--h-accent-2));
+    --on-accent: oklch(99% 0.005 var(--h-ground));
+
+    --ok:   oklch(52% 0.14 150);
+    --warn: oklch(53% 0.11 75);
+    --bad:  oklch(55% 0.19 25);
+    --info: oklch(52% 0.118 240);
+
+    --gl-fill:   oklch(100% 0 0 / .55);
+    --gl-edge:   oklch(20% 0.02 var(--h-ground) / .10);
+    --gl-spec:   oklch(100% 0 0 / .9);
+    --gl-shadow: inset 0 1px 0 var(--gl-spec), 0 10px 30px -12px oklch(0% 0 0 / .18);
+    --gl-inner:  oklch(100% 0 0 / .74);
+    --gl-worst:  color-mix(in srgb, oklch(100% 0 0) 55%, var(--line));
+  }
+}
+
+/* =============================================================================
+   3. ACCESSIBILITY FALLBACKS — non-negotiable, carried from both flagships.
+
+   Glass is a decoration. Every one of these paths must produce a surface that
+   is completely usable with the decoration switched off, which is why .glass
+   falls back to --raised — an opaque plane every ceiling in this file is
+   already measured against — rather than to something invented for the purpose.
+
+     @supports not (backdrop-filter)     the browser cannot blur at all
+     prefers-reduced-transparency        the OS asks for less transparency
+     :root[data-flat="1"]                the manual escape hatch, because
+                                         prefers-reduced-transparency is still
+                                         not Baseline and a user who wants this
+                                         should not have to change an OS setting
+     prefers-reduced-motion              every animation and every transition,
+                                         off. Not shortened — off.
+   ============================================================================= */
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glass { background: var(--raised); }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--raised);
+  }
+}
+
+:root[data-flat="1"] .glass {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--raised);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition-duration: 0ms !important;
+  }
+}

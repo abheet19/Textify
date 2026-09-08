@@ -1,8 +1,20 @@
-# Textify — citation-first study RAG
+<div align="center">
+
+# Textify — answers you can check
+
+Private study notes → relevant passages → a concise, cited answer.
+
+![Python](https://img.shields.io/badge/Python-FastAPI-3776AB?style=for-the-badge)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?style=for-the-badge)
+![Local embeddings](https://img.shields.io/badge/Embeddings-local_BGE-0f766e?style=for-the-badge)
+
+[Open Textify](https://textify-abheet19.fly.dev/) · [Verification workflow](https://github.com/abheet19/Textify/actions)
+
+</div>
 
 ![Textify private workspace](docs/demo/textify-private-workspace.png)
 
-Textify turns a PDF, DOCX, or TXT study source into a **single-user, citation-first retrieval workspace**. It indexes a document into semantic chunks, retrieves the most relevant passages for a question, and returns the answer alongside its source excerpts. The screenshot above is from the current FastAPI build; it shows the private-workspace gate, bounded upload, and bounded question flow.
+Textify turns a PDF, DOCX, or TXT study source into a **single-user, citation-first retrieval workspace**. It indexes a document into semantic chunks, retrieves the most relevant passages for a question, and returns the answer alongside its source excerpts. Use it when you need to find an answer inside your own notes and check the evidence yourself. The workspace is private; unlock it with your access code.
 
 > The repository name is historical. The retired Flask/TextRank/T5 application is being replaced by this FastAPI RAG architecture. Do not describe the current build as BERT-based.
 
@@ -12,23 +24,30 @@ Textify turns a PDF, DOCX, or TXT study source into a **single-user, citation-fi
 2. Upload one PDF, DOCX, or TXT source up to 3 MB.
 3. Textify extracts safe text, makes bounded overlapping chunks, embeds them, and stores the vectors in Neon PostgreSQL with pgvector.
 4. Pick an indexed source and ask a question of up to 500 characters.
-5. Textify retrieves the closest four chunks, generates a bounded answer, and renders the exact evidence used for the answer.
+5. Read a concise answer alongside the four retrieved passages. Check the source before trusting a claim.
+6. Remove a source when you no longer need it; its stored chunks and vectors are deleted together.
 
 ## System design
 
 ```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor':'#e5f2ee','primaryTextColor':'#172d28','lineColor':'#678b80'}}}%%
 flowchart LR
     U[Browser / Glass UI] -->|access code| A[FastAPI]
     U -->|PDF DOCX TXT <= 3 MB| A
     A --> X[bounded text extraction]
     X --> C[Sentence-aware chunker\n180 words / 36 overlap]
-    C --> E[Embedding provider]
+    C --> E[Local BGE embeddings
+384 dimensions]
     E --> P[(Neon PostgreSQL + pgvector)]
     U -->|question <= 500 chars| A
     A --> Q[Question embedding]
     Q --> P
     P -->|cosine top 4 chunks| G[Grounded generation]
     G -->|answer + source labels| U
+    classDef store fill:#f1dfbd,stroke:#8a7048,color:#2e2519;
+    classDef model fill:#d8e6f1,stroke:#5c7990,color:#182c3a;
+    class P store;
+    class E,G model;
 ```
 
 ## Security, privacy, and spending controls
@@ -37,16 +56,28 @@ flowchart LR
 - **Private document inventory.** The code protects document names as well as paid model calls. The current schema is intentionally single-user; it is not a multi-tenant account system.
 - **Small predictable budgets.** Each client can upload three documents and ask twelve questions per hour per process. Uploads are capped at 3 MB, PDFs at 200 pages, expanded DOCX content at 12 MB, extracted text at 120,000 characters, chunks at 120, embeddings at 32 per batch, and generated answers at 350 tokens.
 - **Prompt-injection boundary.** Retrieved document excerpts are wrapped as untrusted data; the generation instruction says that they cannot override rules, request secrets, invoke tools, or justify unsupported claims. The answer always returns its cited chunks for human review.
-- **Provider separation.** `OPENAI_API_KEY` is required for `text-embedding-3-small` indexing. `ANTHROPIC_API_KEY` is preferred for final answer generation; OpenAI generation is an optional fallback. The app never stores a document when semantic indexing is unavailable.
+- **Local semantic indexing.** The deployed local mode uses a pinned, quantized BGE model on CPU; no OpenAI key or embedding API bill is needed. Claude generates the final answer using `ANTHROPIC_API_KEY`. The optional OpenAI mode remains available with its own 1,536-dimensional table pair; embeddings from different models are never mixed. Without a generation key, results are explicitly evidence-only.
 - **HTTP safeguards.** The app limits CORS to `CORS_ORIGINS`, adds `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: same-origin`.
 
-The in-process budgets reduce accidental use and basic abuse. Before a public multi-user launch, add real authentication, per-user document ownership, a shared rate-limit store, provider-side monthly spending caps, request tracing with redaction, deletion controls, and a retrieval evaluation set.
+The in-process budgets reduce accidental use and basic abuse. Before a public multi-user launch, add real authentication, per-user document ownership, a shared rate-limit store, provider-side monthly spending caps, request tracing with redaction, and a retrieval evaluation set. The current access code protects one shared private workspace; it does not provide individual user accounts.
 
 ## Run locally
 
+The simplest free-embedding setup uses the same image as Fly. It downloads the pinned model during build, then runs without model-download network access. Supply your own local PostgreSQL/pgvector URL and private code through environment variables, not the Dockerfile:
+
 ```powershell
-git clone https://github.com/abheet19/Text-Summarizer-System_BERT.git
-cd Text-Summarizer-System_BERT
+docker build -f Dockerfile.local -t textify-local .
+docker run --rm -p 8000:8080 -e DATABASE_URL -e TEXTIFY_ACCESS_CODE -e ANTHROPIC_API_KEY textify-local
+```
+
+`ANTHROPIC_API_KEY` is optional for evidence-only use. Local mode creates separate `bge_v1_documents` and `bge_v1_chunks` tables. Sources indexed by the previous model need uploading again; their original tables remain intact.
+
+<details><summary>Python development with the optional OpenAI embedding path</summary>
+
+
+```powershell
+git clone https://github.com/abheet19/Textify.git
+cd Textify
 py -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 
@@ -60,31 +91,44 @@ $env:CORS_ORIGINS = "http://127.0.0.1:8000"
 
 Open `http://127.0.0.1:8000`.
 
+</details>
+
 ## Verify
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-The focused suite checks chunk overlap, fingerprints, evidence-only behavior, the private access-code guard, and request-shape limits without requiring a live database.
+The current local run passed **29 tests**, including a real PostgreSQL/pgvector workflow and a Chrome browser flow with synthetic AI-provider responses. Without `TEXTIFY_TEST_DATABASE_URL`, integration tests deliberately skip; an offline green run alone is not end-to-end evidence. CI provisions a disposable pgvector database, installs a test browser, and builds both images. The local model was separately checked with real semantic vectors and no hosted AI calls.
+
+The browser checks cover unlock/lock, upload, duplicate detection, source selection, cited evidence, invalid files, rate limits, deletion, themes and mobile layout. They do not establish retrieval accuracy on an unseen corpus or multi-user load capacity.
 
 ## Deploy to Fly.io
 
-The Fly application is `textify-abheet19`. Before deploying the current build, configure a long access code, an embeddings key, allowed origin, and provider spending caps in their dashboards.
+The Fly application is `textify-abheet19`. The local model configuration uses one shared CPU and 512 MiB RAM with automatic stop/start. The Linux image smoke measured **251.6 MiB peak RSS** for the model plus web imports; this is a smoke measurement, not a concurrency benchmark. Local indexing removes embedding API charges, while hosting and Claude generation retain their normal costs.
+
+Configure `DATABASE_URL`, `TEXTIFY_ACCESS_CODE`, and optional `ANTHROPIC_API_KEY` as Fly secrets using its secure input flow. Keep real values out of shell history and Git. Then:
 
 ```powershell
-fly secrets set TEXTIFY_ACCESS_CODE="choose-a-long-random-code" --app textify-abheet19
-fly secrets set OPENAI_API_KEY="..." --app textify-abheet19
-fly secrets set ANTHROPIC_API_KEY="..." --app textify-abheet19
-fly secrets set CORS_ORIGINS="https://textify-abheet19.fly.dev" --app textify-abheet19
-fly deploy --app textify-abheet19
+fly deploy --build-only --remote-only --config fly.local-embeddings.toml
+fly deploy --remote-only --config fly.local-embeddings.toml --app textify-abheet19
+fly checks list --app textify-abheet19
 ```
 
-Never commit `.env.local` or API keys. A deployment is ready only after a provider-backed upload and a cited answer are exercised through the browser.
+`/health` reports process metadata; `/ready` checks database connectivity and model availability. GitHub deployment is manual and depends on the complete verification workflow. The retired GCP workflow is disabled. A push runs tests without unexpectedly replacing the live app. There is no installed pre-commit hook; local tests and CI are the actual gates.
+
+## Current limits
+
+- This is a private, single-user study workspace, not a tenant-isolated document SaaS.
+- English semantic retrieval is supported; scanned PDFs need OCR elsewhere. Citations identify retrieved chunks, not page coordinates.
+- BGE's input is limited to approximately 512 model tokens. Word-bounded chunks can still truncate token-dense content; evaluation and tokenizer-aware chunking remain improvements.
+- A grounding prompt reduces risk but cannot guarantee factual accuracy or perfect citation entailment. The model has no tools or access to service secrets.
+- Request budgets are process-local and reset on restart. They are not a hard provider billing cap. One local inference runs at a time; busy requests receive a retryable 429.
+- No multi-user stress benchmark, independent security audit, or broad retrieval-quality evaluation is claimed.
 
 ## Stack
 
-Python 3.12 · FastAPI · SQLAlchemy · Psycopg · Neon PostgreSQL · pgvector · pypdf · python-docx · Claude Messages API · OpenAI embeddings · Glass CSS
+Python 3.12 · FastAPI · SQLAlchemy · Psycopg · Neon PostgreSQL · pgvector · pypdf · python-docx · Claude Messages API · FastEmbed / BGE ONNX · optional OpenAI embeddings · vendored Glass CSS
 
 ## Author
 

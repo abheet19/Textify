@@ -1,0 +1,395 @@
+/* =============================================================================
+   GLASS — primitives.css
+   Seven primitives. Every declaration reads from src/tokens.css; this file
+   introduces no colour, no radius, no duration and no font of its own.
+
+     .glass   the material          .card   an opaque plane
+     .btn     an action             .field  an input
+     .chip    a label               .state  a status         .gauge  a quantity
+
+   Requires src/tokens.css, and optionally one src/themes/*.css.
+
+   TWO RULES THIS FILE OBEYS AND YOU SHOULD TOO
+
+   1. Nothing here paints with a raw colour. If you want a value that is not a
+      token, the answer is that you want a new token, and it has to clear the
+      budget in scripts/contrast.mjs before it exists.
+
+   2. Colour is never the only channel. Every state carries a fill, a key bar, a
+      glyph and a word — four channels, of which colour is one. Print the page in
+      greyscale, or hand it to a red-green dichromat, and the status still reads.
+      contrast.mjs asserts the glyphs and the labels are unique, and that no two
+      state fills collapse onto the same luminance.
+
+   Verified by: node scripts/contrast.mjs
+   ============================================================================= */
+
+/* =============================================================================
+   0. THE PAGE — opt-in. Add class="glass-page" to <body>.
+   ============================================================================= */
+
+.glass-page {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--fs-1);
+  line-height: var(--lh-3);
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The atmosphere. Glass only refracts if there is something behind it; without
+   this, a .glass pane is a flat plate with a blur on it. Two accent glows and a
+   vignette that closes them back down to the ground at the edges. It is body's
+   own background, under everything, and every opaque plane paints over it —
+   there is no element to mis-stack and no z-index to get wrong. */
+.glass-page.glass-atmosphere {
+  background-image:
+    radial-gradient(58rem 32rem at 18% -8%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%),
+    radial-gradient(48rem 28rem at 88% 4%, color-mix(in srgb, var(--accent-2) 12%, transparent), transparent 70%);
+  background-attachment: fixed;
+}
+
+.glass-page :focus-visible {
+  outline: var(--focus-w) solid var(--focus);
+  outline-offset: var(--focus-off);
+  border-radius: var(--r-1);
+}
+
+/* =============================================================================
+   1. .glass — the material.
+
+   Semi-transparent tint, a real blur with a saturation lift so what shows
+   through reads as refracted rather than smeared, a 1px edge that makes the
+   pane an object, and the specular top edge that says which way the light is.
+
+   Text on .glass must be --ink or --accent. --ink-2 clears it too (4.44:1 at
+   the worst measured glass, which is why tokens.css lifted it a point). --ink-3
+   (2.39:1) and --accent-2 (3.69:1) are graphic-only here, and any state colour
+   on glass belongs in a .state chip, which brings its own opaque fill.
+
+   All three a11y fallbacks in tokens.css §3 target this class.
+   ============================================================================= */
+
+.glass {
+  background: var(--gl-fill);
+  -webkit-backdrop-filter: var(--gl-blur);
+  backdrop-filter: var(--gl-blur);
+  border: 1px solid var(--gl-edge);
+  border-radius: var(--r-3);
+  box-shadow: var(--gl-shadow);
+}
+
+/* The inner plate. A label on bare glass is unmeasurable, because glass has no
+   fixed luminance — it is whatever is behind it. This is the >=60%-alpha fill a
+   dense label sits on so it does have one. Weft's --gl-inner, kept. */
+.glass-inner {
+  background: var(--gl-inner);
+  border-radius: var(--r-2);
+  padding: var(--sp-3) var(--sp-4);
+}
+
+/* =============================================================================
+   2. .card — an opaque plane. The place long-form text lives.
+
+   .card is --surface. .card-raised is --raised, the LIGHTEST plane text may
+   land on and therefore the backdrop every text ceiling in this system is
+   measured against. There is no third option on purpose.
+   ============================================================================= */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  padding: var(--sp-5);
+}
+
+.card-raised { background: var(--raised); }
+
+.card-title {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-2);
+  line-height: var(--lh-1);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.card-note {
+  margin: 0;
+  font-size: var(--fs-0);
+  line-height: var(--lh-2);
+  color: var(--ink-2);
+}
+
+/* =============================================================================
+   3. .btn — an action. Four weights, one shape.
+
+     .btn            quiet   — the default, a bordered plane
+     .btn-primary    loud    — accent fill, --on-accent label
+     .btn-ghost      quieter — no fill until hover
+     .btn-glass      chrome  — sits on top of content, not in it
+
+   --target-min is enforced here rather than left to the caller (WCAG 2.2 SC
+   2.5.8). :disabled uses --ink-3, which is legitimate: a disabled control is
+   explicitly exempt from the contrast minimum, and --ink-3 is the token this
+   system reserves for exactly that.
+   ============================================================================= */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: var(--target-min);
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-1);
+  background: var(--raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-0);
+  font-weight: 550;
+  line-height: var(--lh-1);
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    background var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    transform var(--t-fast) var(--ease);
+}
+
+.btn:hover { border-color: var(--accent); }
+.btn:active { transform: translateY(1px); }
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  color: var(--ink-3);
+  border-color: var(--line);
+  background: var(--surface);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+/* Hover darkens toward the ground on the dark theme and toward the ink on the
+   light one — a single mix that moves the right way on both, because --ink is
+   whichever end of the ramp the ground is not. */
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--accent) 88%, var(--ink));
+  border-color: color-mix(in srgb, var(--accent) 88%, var(--ink));
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-2);
+}
+
+.btn-ghost:hover {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  border-color: transparent;
+  color: var(--ink);
+}
+
+.btn-glass {
+  background: var(--gl-fill);
+  -webkit-backdrop-filter: var(--gl-blur);
+  backdrop-filter: var(--gl-blur);
+  border-color: var(--gl-edge);
+  box-shadow: var(--gl-shadow);
+  color: var(--ink);
+}
+
+/* =============================================================================
+   4. .field — an input. Recessed rather than raised: on the dark ground it is
+   the --bg showing through the --surface plane, and on the light ground the
+   same relationship runs the other way. Same class, no theme-specific rule.
+   ============================================================================= */
+
+.field {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: var(--target-min);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-1);
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--fs-1);
+  line-height: var(--lh-2);
+  transition: border-color var(--t-fast) var(--ease);
+}
+
+.field::placeholder { color: var(--ink-3); }
+.field:hover { border-color: color-mix(in srgb, var(--line) 60%, var(--ink)); }
+.field:focus { border-color: var(--accent); outline: none; }
+.field:focus-visible {
+  outline: var(--focus-w) solid var(--focus);
+  outline-offset: var(--focus-off);
+}
+
+.field-label {
+  display: block;
+  margin-bottom: var(--sp-1);
+  font-size: var(--fs-0);
+  font-weight: 550;
+  color: var(--ink-2);
+}
+
+.field-mono { font-family: var(--font-mono); font-variant-ligatures: none; }
+
+.field:invalid,
+.field[aria-invalid="true"] { border-color: var(--bad); }
+
+/* =============================================================================
+   5. .chip — a label. Neutral by default; .chip-accent when it is the brand's.
+   Never a status: a status is a .state, and the difference is that a state
+   carries four channels and a chip carries one.
+   ============================================================================= */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--ink) 8%, var(--surface));
+  color: var(--ink-2);
+  font-size: var(--fs-0);
+  font-weight: 550;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.chip-accent {
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--surface));
+  color: var(--ink);
+}
+
+.chip-mono { font-family: var(--font-mono); font-size: var(--fs-0); }
+
+/* =============================================================================
+   6. .state — a status, in four channels.
+
+   THE FILL IS OPAQUE, ALWAYS. A state colour never sits directly on glass —
+   glass has no fixed luminance, so a ratio measured against it is a guess. The
+   chip brings its own opaque plane, mixed 22% of the state colour into
+   --surface, and every ratio below is measured against THAT.
+
+   THE LABEL IS --ink, NOT THE STATE COLOUR, and that was measured rather than
+   chosen. The state colour on its own 22% fill reads 4.60-6.89:1 on the dark
+   ground but only 3.73-3.92:1 on the light one — below AA. So the colour is the
+   key bar and the glyph (3:1 graphic, cleared on both grounds) and the word is
+   ink. This is Zeno's construction, arrived at again from the numbers.
+
+   AND THE FOUR FILLS LADDER IN GREYSCALE, which is why tokens.css §1.5 moved
+   the four state lightnesses off the values Weft and Vantage ship. At L
+   76/80/70/76 the ok, warn and info fills land within 0.0009 luminance of each
+   other: identical chips in a black-and-white print. The gaps are now 0.0036,
+   0.0064 and 0.0058, and contrast.mjs fails if any pair collapses again.
+
+   FOUR CHANNELS: --st-fill (plane) · --st-key (bar + glyph) · --st-glyph
+   (shape) · --st-label (word). contrast.mjs parses these four out of this file,
+   so the budget tracks the stylesheet and cannot drift from it.
+   ============================================================================= */
+
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--target-min);
+  padding: var(--sp-1) var(--sp-3) var(--sp-1) var(--sp-2);
+  border-radius: var(--r-1);
+  border: 1px solid color-mix(in srgb, var(--st-key) 30%, var(--st-fill));
+  border-left: 3px solid var(--st-key);
+  background: var(--st-fill);
+  color: var(--st-ink);
+  font-size: var(--fs-0);
+  font-weight: 550;
+  line-height: var(--lh-1);
+  white-space: nowrap;
+  --st-fill: var(--surface);
+  --st-ink: var(--ink);
+  --st-key: var(--ink-2);
+  --st-glyph: "\00B7";
+  --st-label: "state";
+}
+
+.state::before {
+  content: var(--st-glyph);
+  color: var(--st-key);
+  font-family: var(--font-mono);
+  font-size: 1.05em;
+  line-height: 1;
+}
+
+/* The word is not decoration and not optional — it is the channel that survives
+   a greyscale print and a colour-vision difference. Use .state-text to render
+   it from the token rather than hand-typing it out of sync. */
+.state-text::after { content: var(--st-label); }
+
+.state-ok   { --st-fill: color-mix(in srgb, var(--ok) 22%, var(--surface));   --st-ink: var(--ink); --st-key: var(--ok);   --st-glyph: "\2713"; --st-label: "OK"; }
+.state-warn { --st-fill: color-mix(in srgb, var(--warn) 22%, var(--surface)); --st-ink: var(--ink); --st-key: var(--warn); --st-glyph: "\25B2"; --st-label: "Warning"; }
+.state-bad  { --st-fill: color-mix(in srgb, var(--bad) 22%, var(--surface));  --st-ink: var(--ink); --st-key: var(--bad);  --st-glyph: "\2715"; --st-label: "Error"; }
+.state-info { --st-fill: color-mix(in srgb, var(--info) 22%, var(--surface)); --st-ink: var(--ink); --st-key: var(--info); --st-glyph: "\25CF"; --st-label: "Info"; }
+
+/* =============================================================================
+   7. .gauge — a quantity. A determinate bar and nothing else.
+
+   There is deliberately no indeterminate spinner in this package. An
+   indeterminate spinner is an animation that claims to be information; if the
+   progress is not known, say so in words.
+
+   The track is --line and the fill is --accent: 6.27:1 dark, 4.62:1 light, both
+   well past the 3:1 a bar has to clear. .gauge-ok / -warn / -bad swap the fill
+   for a state colour when the quantity itself is the status.
+   ============================================================================= */
+
+.gauge {
+  display: block;
+  width: 100%;
+  height: var(--sp-2);
+  border-radius: var(--r-pill);
+  background: var(--line);
+  overflow: hidden;
+}
+
+.gauge-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width var(--t-slow) var(--ease);
+}
+
+.gauge-ok   .gauge-fill { background: var(--ok); }
+.gauge-warn .gauge-fill { background: var(--warn); }
+.gauge-bad  .gauge-fill { background: var(--bad); }
+
+.gauge-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-size: var(--fs-0);
+  color: var(--ink-2);
+}
+
+.gauge-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}

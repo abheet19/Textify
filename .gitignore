@@ -114,16 +114,16 @@ bert-*/
 .cache/
 huggingface_cache/
 
-# Test files and debug scripts (DO NOT TRACK THESE)
-test_*.py
-*_test.py
+# Root-level scratch scripts; application entrypoints and tests/ are tracked
+/test_*.py
+/*_test.py
 debug_*.py
 analyze_*.py
 enhanced_*.py
 minimal_*.py
 quick_*.py
 simple_*.py
-main.py
+/main.py
 README_new.md
 test_*.html
 test_*.txt
