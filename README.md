@@ -1,14 +1,27 @@
 <div align="center">
 
+<br>
+
+<img src="brand/mark.svg" alt="Textify mark" width="112">
+
 # Textify — answers you can check
 
-Private study notes → relevant passages → a concise, cited answer.
+### **Private notes → relevant passages → a concise, cited answer.**
+
+<br>
+
+[![CI](https://github.com/abheet19/Textify/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/abheet19/Textify/actions/workflows/ci.yml)
+[![Live](https://img.shields.io/badge/demo-live-C47732)](https://textify-abheet19.fly.dev/)
+
+<br>
 
 ![Python](https://img.shields.io/badge/Python-FastAPI-3776AB?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-4169E1?style=for-the-badge)
 ![Local embeddings](https://img.shields.io/badge/Embeddings-local_BGE-0f766e?style=for-the-badge)
 
-[Open Textify](https://textify-abheet19.fly.dev/) · [Verification workflow](https://github.com/abheet19/Textify/actions)
+<br>
+
+[**Open Textify →**](https://textify-abheet19.fly.dev/) · [Source](https://github.com/abheet19/Textify) · [Verification workflow](https://github.com/abheet19/Textify/actions)
 
 </div>
 
