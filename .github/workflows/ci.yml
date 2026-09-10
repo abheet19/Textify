@@ -1,12 +1,15 @@
 name: Verify Textify
+
 on:
   push:
     branches: [main, master]
   pull_request:
   workflow_dispatch:
   workflow_call:
+
 permissions:
   contents: read
+
 jobs:
   workflow-tests:
     runs-on: ubuntu-latest
@@ -27,14 +30,24 @@ jobs:
       TEXTIFY_RUN_BROWSER_TESTS: '1'
       TEXTIFY_EVIDENCE_DIR: ${{ github.workspace }}/browser-results
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
-      - uses: actions/setup-node@v4
+          cache: pip
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
-      - run: python -m pip install -r requirements-dev.txt
+          cache: npm
+      - name: Install test and audit dependencies
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python -m pip install pip-audit==2.10.1
+      - name: Audit both production dependency graphs
+        run: |
+          python -m pip check
+          pip-audit -r requirements.txt
+          pip-audit -r requirements-local.txt
       - name: Enable pgvector in the disposable CI database
         run: |
           python - <<'PY'
@@ -44,15 +57,54 @@ jobs:
           PY
       - name: Install isolated browser test tooling
         run: |
-          npm install --no-save --ignore-scripts playwright@1.49.1
+          npm install --no-save --ignore-scripts playwright@1.63.0
           npx playwright install --with-deps chromium
-      - name: Test real APIs, pgvector and browser with synthetic provider responses
-        run: python -m pytest -q --tb=short
-      - name: Fresh-checkout Docker build
+      - name: Test APIs, pgvector, and browser with synthetic provider responses
         run: |
-          docker build --tag textify-ci .
-          docker build --file Dockerfile.local --tag textify-local-ci .
-      - uses: actions/upload-artifact@v4
+          python -m pytest -q --tb=short
+          python -m compileall -q app tests
+      - name: Build exact-revision production images
+        run: |
+          docker build --build-arg "VCS_REF=${GITHUB_SHA}" --tag textify-ci .
+          docker build --build-arg "VCS_REF=${GITHUB_SHA}" --file Dockerfile.local --tag textify-local-ci .
+          test "$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' textify-ci)" = "${GITHUB_SHA}"
+          test "$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' textify-local-ci)" = "${GITHUB_SHA}"
+          test "$(docker inspect --format '{{.Config.User}}' textify-ci)" = "textify:textify"
+          test "$(docker inspect --format '{{.Config.User}}' textify-local-ci)" = "textify:textify"
+      - name: Exercise the real local-embedding image end to end
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name textify-local-runtime --network host --env PORT=18080 --env "DATABASE_URL=${TEXTIFY_TEST_DATABASE_URL}" --env TEXTIFY_ACCESS_CODE=synthetic-container-code --env TEXTIFY_REQUIRE_ACCESS_CODE=1 textify-local-ci
+
+          cleanup() {
+            docker logs textify-local-runtime || true
+            docker rm --force textify-local-runtime >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          for attempt in {1..90}; do
+            if curl --fail --silent --max-time 5 http://127.0.0.1:18080/ready >/tmp/textify-ready.json; then
+              break
+            fi
+            sleep 2
+          done
+          curl --fail --silent --show-error http://127.0.0.1:18080/ready >/tmp/textify-ready-final.json
+          curl --fail --silent --show-error http://127.0.0.1:18080/health >/tmp/textify-health.json
+          python -c 'import json, os; assert json.load(open("/tmp/textify-ready-final.json"))["release"] == os.environ["GITHUB_SHA"]'
+          python -c 'import json; assert json.load(open("/tmp/textify-health.json"))["embedding_provider"] == "local"'
+          test "$(docker exec textify-local-runtime id -u)" = "10001"
+          test "$(docker exec textify-local-runtime id -g)" = "10001"
+          docker exec textify-local-runtime sh -c 'test ! -w /app/app/main.py'
+          docker exec textify-local-runtime python -m pip check
+
+          upload_response="$(curl --fail --silent --show-error --max-time 90 --header 'X-Textify-Access-Code: synthetic-container-code' --form 'file=@tools/demo-assets/antikythera-mechanism.txt;type=text/plain' http://127.0.0.1:18080/api/documents)"
+          document_id="$(printf '%s' "$upload_response" | python -c 'import json,sys; print(json.load(sys.stdin)["id"])')"
+          DOCUMENT_ID="$document_id" python -c 'import json, os; print(json.dumps({"question": "What is the Antikythera mechanism?", "document_id": os.environ["DOCUMENT_ID"]}))' >/tmp/textify-question.json
+          answer_response="$(curl --fail --silent --show-error --max-time 60 --header 'X-Textify-Access-Code: synthetic-container-code' --header 'Content-Type: application/json' --data-binary @/tmp/textify-question.json http://127.0.0.1:18080/api/ask)"
+          printf '%s' "$answer_response" | python -c 'import json,sys; body=json.load(sys.stdin); assert body["generation_mode"]=="evidence-only" and body["citations"]'
+          curl --fail --silent --show-error --request DELETE --header 'X-Textify-Access-Code: synthetic-container-code' "http://127.0.0.1:18080/api/documents/${document_id}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: textify-browser-evidence

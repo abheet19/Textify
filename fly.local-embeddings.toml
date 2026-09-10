@@ -1,25 +1,29 @@
 app = "textify-abheet19"
 primary_region = "bom"
+
 [build]
   dockerfile = "Dockerfile.local"
+
 [http_service]
   internal_port = 8080
   force_https = true
   auto_stop_machines = "stop"
   auto_start_machines = true
   min_machines_running = 0
-[[vm]]
-  memory = "512mb"
-  cpu_kind = "shared"
-  cpus = 1
 
 [env]
   TEXTIFY_EMBEDDING_PROVIDER = "local"
   TEXTIFY_REQUIRE_ACCESS_CODE = "1"
   CORS_ORIGINS = "https://textify-abheet19.fly.dev"
+
 [[http_service.checks]]
   interval = "30s"
   timeout = "5s"
-  grace_period = "45s"
+  grace_period = "60s"
   method = "GET"
   path = "/ready"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

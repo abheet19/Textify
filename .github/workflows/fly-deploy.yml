@@ -1,4 +1,5 @@
 name: Deploy verified Textify to Fly
+
 on:
   workflow_dispatch:
     inputs:
@@ -8,20 +9,24 @@ on:
         default: local
         type: choice
         options: [local, openai]
+
 permissions:
   contents: read
+
 concurrency:
   group: textify-fly-deploy
   cancel-in-progress: false
+
 jobs:
   verify:
     uses: ./.github/workflows/ci.yml
+
   deploy:
     needs: verify
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1
       - name: Check configuration names before changing the live app
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
@@ -29,7 +34,7 @@ jobs:
         run: |
           set -eu
           names="$(flyctl secrets list --app textify-abheet19)"
-          required_names="DATABASE_URL TEXTIFY_ACCESS_CODE ANTHROPIC_API_KEY"
+          required_names="DATABASE_URL TEXTIFY_ACCESS_CODE"
           if [ "$PROVIDER" = "openai" ]; then
             required_names="$required_names OPENAI_API_KEY"
             echo "FLY_CONFIG=fly.toml" >> "$GITHUB_ENV"
@@ -43,6 +48,23 @@ jobs:
             fi
           done
       - name: Deploy the fully verified selected revision
-        run: flyctl deploy --remote-only --config "$FLY_CONFIG" --app textify-abheet19
+        run: flyctl deploy --remote-only --config "$FLY_CONFIG" --app textify-abheet19 --build-arg "VCS_REF=${GITHUB_SHA}" --wait-timeout 10m
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      - name: Verify live readiness and exact revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          health_file="$(mktemp)"
+          for attempt in {1..90}; do
+            if curl --fail --silent --show-error --max-time 20 https://textify-abheet19.fly.dev/health >"$health_file"; then
+              if EXPECTED_RELEASE="$GITHUB_SHA" HEALTH_FILE="$health_file" python -c 'import json, os; assert json.load(open(os.environ["HEALTH_FILE"]))["release"] == os.environ["EXPECTED_RELEASE"]'; then
+                if curl --fail --silent --show-error --max-time 20 https://textify-abheet19.fly.dev/ready >/dev/null; then
+                  exit 0
+                fi
+              fi
+            fi
+            sleep 3
+          done
+          cat "$health_file"
+          exit 1

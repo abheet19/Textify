@@ -61,7 +61,6 @@ refresh();
 $("#theme").onclick = () => document.documentElement.dataset.theme = document.documentElement.dataset.theme === "light" ? "dark" : "light";
 $("#unlock").onsubmit = event => { event.preventDefault(); clearAnswer(); refresh(); };
 $("#lock").onclick = () => { accessCode.value = ""; refresh(); };
-accessCode.onchange = () => { clearAnswer(); refresh(); };
 docs.onchange = () => { clearAnswer(); $("#remove").disabled = !docs.value; };
 
 $("#upload").onsubmit = async event => {

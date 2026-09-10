@@ -65,7 +65,7 @@ flowchart LR
 - **Small predictable budgets.** Each client can upload three documents and ask twelve questions per hour per process. Uploads are capped at 3 MB, PDFs at 200 pages, expanded DOCX content at 12 MB, extracted text at 120,000 characters, chunks at 120, embeddings at 32 per batch, and generated answers at 350 tokens.
 - **Prompt-injection boundary.** Retrieved document excerpts are wrapped as untrusted data; the generation instruction says that they cannot override rules, request secrets, invoke tools, or justify unsupported claims. The answer always returns its cited chunks for human review.
 - **Local semantic indexing.** The deployed local mode uses a pinned, quantized BGE model on CPU; no OpenAI key or embedding API bill is needed. Claude generates the final answer using `ANTHROPIC_API_KEY`. The optional OpenAI mode remains available with its own 1,536-dimensional table pair; embeddings from different models are never mixed. Without a generation key, results are explicitly evidence-only.
-- **HTTP safeguards.** The app limits CORS to `CORS_ORIGINS`, adds `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: same-origin`.
+- **HTTP safeguards.** The app limits CORS to `CORS_ORIGINS` and sends a self-only content policy, framing and browser-permission restrictions, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: same-origin`.
 
 The in-process budgets reduce accidental use and basic abuse. Before a public multi-user launch, add real authentication, per-user document ownership, a shared rate-limit store, provider-side monthly spending caps, request tracing with redaction, and a retrieval evaluation set. The current access code protects one shared private workspace; it does not provide individual user accounts.
 
@@ -107,23 +107,24 @@ Open `http://127.0.0.1:8000`.
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-The current local run passed **29 tests**, including a real PostgreSQL/pgvector workflow and a Chrome browser flow with synthetic AI-provider responses. Without `TEXTIFY_TEST_DATABASE_URL`, integration tests deliberately skip; an offline green run alone is not end-to-end evidence. CI provisions a disposable pgvector database, installs a test browser, and builds both images. The local model was separately checked with real semantic vectors and no hosted AI calls.
+The current clean-environment run passed **30 tests**, including a real PostgreSQL/pgvector workflow and a Chromium browser flow with synthetic AI-provider responses. Without `TEXTIFY_TEST_DATABASE_URL`, integration tests deliberately skip; an offline green run alone is not end-to-end evidence. CI provisions disposable pgvector, drives a real browser, builds both images, and runs the local image through a real upload, semantic retrieval, evidence-only answer, and deletion without a hosted AI call. See [`CONTEXT.md`](CONTEXT.md) and [`docs/TESTING.md`](docs/TESTING.md) for the compact architecture and release gates.
 
 The browser checks cover unlock/lock, upload, duplicate detection, source selection, cited evidence, invalid files, rate limits, deletion, themes and mobile layout. They do not establish retrieval accuracy on an unseen corpus or multi-user load capacity.
 
 ## Deploy to Fly.io
 
-The Fly application is `textify-abheet19`. The local model configuration uses one shared CPU and 512 MiB RAM with automatic stop/start. The Linux image smoke measured **251.6 MiB peak RSS** for the model plus web imports; this is a smoke measurement, not a concurrency benchmark. Local indexing removes embedding API charges, while hosting and Claude generation retain their normal costs.
+The Fly application is `textify-abheet19`. The local model configuration uses one shared CPU and 512 MiB RAM with automatic stop/start. The current Linux image smoke measured about **256 MiB peak RSS** for the model plus web imports; this is a build-time smoke measurement, not a concurrency benchmark. Local indexing removes embedding API charges, while hosting and Claude generation retain their normal costs.
 
 Configure `DATABASE_URL`, `TEXTIFY_ACCESS_CODE`, and optional `ANTHROPIC_API_KEY` as Fly secrets using its secure input flow. Keep real values out of shell history and Git. Then:
 
 ```powershell
 fly deploy --build-only --remote-only --config fly.local-embeddings.toml
-fly deploy --remote-only --config fly.local-embeddings.toml --app textify-abheet19
+$sha = git rev-parse HEAD
+fly deploy --remote-only --config fly.local-embeddings.toml --app textify-abheet19 --build-arg "VCS_REF=$sha"
 fly checks list --app textify-abheet19
 ```
 
-`/health` reports process metadata; `/ready` checks database connectivity and model availability. GitHub deployment is manual and depends on the complete verification workflow. The retired GCP workflow is disabled. A push runs tests without unexpectedly replacing the live app. There is no installed pre-commit hook; local tests and CI are the actual gates.
+`/health` reports architecture and the deployed Git revision; `/ready` checks database connectivity and model availability and reports the same revision. GitHub deployment is manual and depends on the complete verification workflow. The retired GCP workflow is disabled. A push runs tests without unexpectedly replacing the live app. There is no installed pre-commit hook; local tests and CI are the actual gates.
 
 ## Current limits
 

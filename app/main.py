@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import io
+import logging
 import math
 import os
+import time
 import uuid
 import zipfile
 from contextlib import asynccontextmanager
@@ -24,6 +26,9 @@ from pgvector.sqlalchemy import Vector
 
 from .guard import require_access_code, require_paid_access
 from .rag import MAX_ANSWER_TOKENS, chunk_text, grounded_answer, source_fingerprint
+
+logger = logging.getLogger("uvicorn.error")
+RELEASE_SHA = os.getenv("TEXTIFY_RELEASE_SHA", "unknown")
 
 MAX_UPLOAD_BYTES = 3 * 1024 * 1024
 MAX_EXTRACTED_CHARS = 120_000
@@ -84,7 +89,7 @@ async def lifespan(_: FastAPI):
 
 
 allowed_origins = [value.strip() for value in os.getenv("CORS_ORIGINS", "").split(",") if value.strip()]
-app = FastAPI(title="Textify", version="2.1.0", lifespan=lifespan)
+app = FastAPI(title="Textify", version="2.2.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -95,11 +100,31 @@ app.mount("/static", StaticFiles(directory=Path(__file__).parent / "web"), name=
 
 
 @app.middleware("http")
-async def security_headers(request: Request, call_next):
-    response = await call_next(request)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["Referrer-Policy"] = "same-origin"
+async def observe_and_secure(request: Request, call_next):
+    started = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        route = getattr(request.scope.get("route"), "path", "<unmatched>")
+        logger.exception("request_failed method=%s route=%s", request.method, route)
+        raise
+    route = getattr(request.scope.get("route"), "path", "<unmatched>")
+    logger.info(
+        "request_complete method=%s route=%s status=%d duration_ms=%.1f",
+        request.method,
+        route,
+        response.status_code,
+        (time.perf_counter() - started) * 1000,
+    )
     response.headers["Cache-Control"] = "no-store"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; "
+        "form-action 'self'; img-src 'self' data:; object-src 'none'"
+    )
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Referrer-Policy"] = "same-origin"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
     return response
 
 
@@ -171,6 +196,7 @@ def health():
     return {
         "status": "ok",
         "service": "textify",
+        "release": RELEASE_SHA,
         "storage": "postgresql-pgvector",
         "retrieval": "semantic",
         "embedding_provider": EMBEDDING_PROVIDER,
@@ -190,7 +216,7 @@ def ready():
             warm_model()
     except Exception as error:
         raise HTTPException(503, "Workspace dependencies are not ready.") from error
-    return {"status": "ready"}
+    return {"status": "ready", "release": RELEASE_SHA}
 
 
 @app.get("/api/documents")
@@ -227,7 +253,9 @@ def ingest_document(request: Request, file: UploadFile = File(...)):
         if existing:
             return {"id": existing.id, "name": existing.name, "chunks": len(existing.chunks), "deduplicated": True}
         vectors = embed([chunk.text for chunk in chunks])
-        doc = StudyDocument(id=str(uuid.uuid4()), name=Path((file.filename or "document").replace("\\", "/")).name[:255], fingerprint=fingerprint)
+        raw_name = Path((file.filename or "document").replace("\\", "/")).name
+        safe_name = "".join(character for character in raw_name if character.isprintable()).strip()[:255] or "document"
+        doc = StudyDocument(id=str(uuid.uuid4()), name=safe_name, fingerprint=fingerprint)
         session.add(doc)
         session.add_all(
             StudyChunk(id=str(uuid.uuid4()), document=doc, position=chunk.position, content=chunk.text, embedding=vector)

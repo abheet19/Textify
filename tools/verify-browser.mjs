@@ -14,6 +14,13 @@ const page = await context.newPage();
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
 const checks = [];
+const documentListResponses = [];
+page.on('response', response => {
+  const request = response.request();
+  if (request.method() === 'GET' && new URL(response.url()).pathname === '/api/documents') {
+    documentListResponses.push(response.status());
+  }
+});
 const check = async (name, fn) => { await fn(); checks.push(name); };
 try {
   await page.goto(url);
@@ -22,6 +29,7 @@ try {
     await page.getByLabel('Access code', { exact: false }).fill('wrong-code');
     await page.getByRole('button', { name: 'Unlock workspace', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('#access-status').textContent.includes('valid Textify access code'));
+    assert.deepEqual(documentListResponses, [401]);
   });
   await check('unlock empty inventory and session-only code', async () => {
     await page.locator('#access-code').fill('synthetic-test-code');
@@ -29,6 +37,7 @@ try {
     await page.waitForFunction(() => document.querySelector('#access-status').textContent.includes('unlocked'));
     assert.equal(await page.evaluate(() => sessionStorage.getItem('textify-access-code')), 'synthetic-test-code');
     assert.equal(await page.evaluate(() => localStorage.getItem('textify-access-code')), null);
+    assert.deepEqual(documentListResponses, [401, 200]);
   });
   await check('missing selection produces an in-page actionable error', async () => {
     await page.getByLabel('Question', { exact: true }).fill('Explain the privacy boundary');
