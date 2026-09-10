@@ -2,6 +2,8 @@
 
 This is the compact source of truth for engineers and coding agents. Read it with `README.md` and `docs/TESTING.md` before changing the product.
 
+> Release snapshot, checked 10 September 2026 IST: the local metadata/favicon candidate is `feb6df3ce73f681ca1b4d376d8df198f8d2e901c`, one application commit ahead of public `master` and the verified Fly v11 release at `629511776ff5ba71b35974991f78ebefa71dc3b3`. This documentation-only commit is layered on that candidate. Current `/health` and `/ready` responses return HTTP 200 and report `6295117...`; neither local commit is pushed or deployed. The application candidate passed focused root/metadata/favicon checks and bounded mobile/desktop Lighthouse runs, but its broader pytest invocation did not terminate after teardown, so the 30/30 full-suite result applies to the live release tree rather than this candidate.
+
 ## Product boundary
 
 Textify is a private, single-user, citation-first RAG workspace for PDF, DOCX, and TXT study material. A user unlocks the workspace with one access code, uploads a source, asks a question, sees a concise answer and the four retrieved passages, and can delete the source. It is not a multi-tenant document SaaS and it does not claim automatic factual correctness.
