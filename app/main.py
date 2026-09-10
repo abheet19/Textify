@@ -18,7 +18,7 @@ import requests
 from docx import Document as DocxDocument
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pgvector.sqlalchemy import Vector
 from pydantic import BaseModel, Field
@@ -418,6 +418,7 @@ def delete_document(document_id: str, request: Request):
             raise HTTPException(404, "Document not found.")
         session.delete(document)
         session.commit()
+    return Response(status_code=204)
 
 
 @app.get("/")

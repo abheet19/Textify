@@ -30,7 +30,11 @@ page.on("console", (message) => {
   if (message.type() === "error") consoleErrors.push(message.text());
 });
 page.on("requestfailed", (request) =>
-  requestFailures.push(`${request.method()} ${request.url()}`),
+  requestFailures.push({
+    method: request.method(),
+    url: request.url(),
+    errorText: request.failure()?.errorText ?? "unknown",
+  }),
 );
 const checks = [];
 const documentListResponses = [];
@@ -408,10 +412,26 @@ try {
   const unexpectedConsoleErrors = consoleErrors.filter(
     (message) => !expectedConsoleStatusPattern.test(message),
   );
+  // Chromium reports a completed fetch receiving HTTP 204 as
+  // requestfailed/net::ERR_ABORTED. The workflow already proved the delete by
+  // observing its success status and the empty refreshed document list, so
+  // classify only that exact browser quirk and keep every other failure fatal.
+  const expectedRequestFailures = requestFailures.filter((failure) => {
+    const pathname = new URL(failure.url).pathname;
+    return (
+      failure.method === "DELETE" &&
+      failure.errorText === "net::ERR_ABORTED" &&
+      /^\/api\/documents\/[0-9a-f-]{36}$/.test(pathname)
+    );
+  });
+  const unexpectedRequestFailures = requestFailures.filter(
+    (failure) => !expectedRequestFailures.includes(failure),
+  );
   assert.deepEqual(errors, []);
   assert.deepEqual(expectedConsoleStatuses, [401, 415, 429]);
   assert.deepEqual(unexpectedConsoleErrors, []);
-  assert.deepEqual(requestFailures, []);
+  assert.equal(expectedRequestFailures.length, 1);
+  assert.deepEqual(unexpectedRequestFailures, []);
   await writeFile(
     path.join(out, "browser-results.json"),
     JSON.stringify(
@@ -422,7 +442,8 @@ try {
         errors,
         expectedConsoleErrors,
         unexpectedConsoleErrors,
-        requestFailures,
+        expectedRequestFailures,
+        unexpectedRequestFailures,
         scope:
           "Real local UI/API/PostgreSQL pgvector with isolated synthetic data and mocked provider responses; no paid provider verification.",
       },
@@ -431,7 +452,7 @@ try {
     ),
   );
   console.log(
-    `Textify browser: ${checks.length} workflows passed; expected 401/415/429 diagnostics observed; no unexpected browser errors.`,
+    `Textify browser: ${checks.length} workflows passed; expected 401/415/429 diagnostics and Chromium 204 abort observed; no unexpected browser errors.`,
   );
 } finally {
   await browser.close();

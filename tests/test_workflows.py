@@ -69,7 +69,10 @@ def test_real_database_upload_dedupe_retrieve_delete(workspace, extension):
     assert all("Privacy" in citation["text"] for citation in answer.json()["citations"])
     assert answer.headers["Cache-Control"] == "no-store"
     assert w.client.delete(f"/api/documents/{doc['id']}").status_code == 401
-    assert w.client.delete(f"/api/documents/{doc['id']}", headers=w.headers).status_code == 204
+    deleted = w.client.delete(f"/api/documents/{doc['id']}", headers=w.headers)
+    assert deleted.status_code == 204
+    assert deleted.content == b""
+    assert deleted.headers.get("content-length") in {None, "0"}
     with w.main.SessionLocal() as session:
         assert session.query(w.main.StudyChunk).count() == 0
     count = len(w.calls)
