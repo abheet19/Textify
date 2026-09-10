@@ -1,4 +1,5 @@
 """Small, dependency-free guardrails for Textify's paid endpoints."""
+
 from __future__ import annotations
 
 import hashlib
@@ -57,12 +58,18 @@ def client_key(request: Request) -> str:
 
 def require_access_code(request: Request) -> None:
     """Protect a single-user workspace and fail closed in public deployment."""
+    validate_access_code(request.headers.get("x-textify-access-code", ""))
+
+
+def validate_access_code(supplied: str) -> None:
+    """Validate a supplied code without reading an HTTP request body."""
     required = os.getenv("TEXTIFY_ACCESS_CODE", "")
-    production = os.getenv("TEXTIFY_REQUIRE_ACCESS_CODE", "").lower() in {"1", "true"} or bool(os.getenv("FLY_APP_NAME"))
+    production = os.getenv("TEXTIFY_REQUIRE_ACCESS_CODE", "").lower() in {"1", "true"} or bool(
+        os.getenv("FLY_APP_NAME")
+    )
     if production and not required:
         raise HTTPException(503, "Textify is not enabled for public requests.")
     if required:
-        supplied = request.headers.get("x-textify-access-code", "")
         if not hmac.compare_digest(supplied, required):
             raise HTTPException(401, "A valid Textify access code is required.")
 
@@ -75,4 +82,3 @@ def require_paid_access(request: Request, operation: str) -> None:
 
 def content_fingerprint(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
-

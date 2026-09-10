@@ -1,28 +1,115 @@
 <!doctype html>
 <html lang="en" data-glass="textify">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Textify — evidence-first study workspace</title>
-  <meta name="description" content="A private study workspace for semantic document search, cited answers, and source-grounded learning.">
-  <link rel="icon" type="image/svg+xml" href="/static/mark.svg">
-  <link rel="stylesheet" href="/static/vendor/glass/tokens.css">
-  <link rel="stylesheet" href="/static/vendor/glass/textify.css">
-  <link rel="stylesheet" href="/static/vendor/glass/primitives.css">
-  <link rel="stylesheet" href="/static/app.css">
-</head>
-<body>
-  <main class="shell">
-    <header><a class="brand" href="/">TEXTIFY <span>2.2</span></a><button id="theme" class="quiet" type="button">Toggle ground</button></header>
-    <section class="hero"><p class="eyebrow">EVIDENCE-FIRST STUDY WORKSPACE</p><h1>Ask your documents.<br><em>See the evidence.</em></h1><p>Find relevant passages and ask for a cited answer. Check each generated claim against the source excerpts below.</p></section>
-    <section class="access panel"><p class="eyebrow">PRIVATE WORKSPACE</p><form id="unlock"><label for="access-code">Access code <span>stored only for this browser session</span></label><input id="access-code" type="password" autocomplete="off" placeholder="Enter your private access code"><button>Unlock workspace</button><button id="lock" class="quiet" type="button">Lock workspace</button></form><p id="access-status" class="status" role="status">A code protects document names, uploads, and model requests.</p></section>
-    <section class="grid">
-      <article class="panel"><p class="eyebrow">01 · INDEX</p><h2>Add a source</h2><form id="upload"><label for="file">PDF, DOCX, or TXT source</label><input id="file" type="file" accept=".pdf,.docx,.txt" required><button>Build evidence index</button></form><p id="upload-status" class="status" role="status">PDF, DOCX, TXT · max 3 MB · 3 uploads per hour</p></article>
-      <article class="panel"><p class="eyebrow">02 · RETRIEVE</p><h2>Ask precisely</h2><label for="documents">Indexed source</label><select id="documents"><option value="">Enter the access code to load sources</option></select><button id="remove" class="quiet" type="button" disabled>Remove source</button><form id="ask"><label for="question">Question</label><textarea id="question" minlength="6" maxlength="500" placeholder="What does this document conclude about…" required></textarea><button>Find supported answer</button></form><p id="ask-status" class="status" role="status">12 questions per hour per client. Answers are capped at 350 tokens.</p></article>
-    </section>
-    <section id="answer" class="answer hidden"><p class="eyebrow">03 · GROUNDED ANSWER</p><div id="answer-text"></div><div id="citations" class="citations"></div></section>
-    <section class="principles"><div><b>Chunked</b><span>Sentence-aware overlap keeps context intact.</span></div><div><b>Semantic</b><span>pgvector ranks meaning, not only keywords.</span></div><div><b>Cited</b><span>Every answer exposes its retrieved evidence.</span></div></section>
-  </main>
-  <script src="/static/app.js"></script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Textify — evidence-first study workspace</title>
+    <meta
+      name="description"
+      content="A private study workspace for semantic document search, cited answers, and source-grounded learning."
+    />
+    <link rel="icon" type="image/svg+xml" href="/static/mark.svg" />
+    <link rel="stylesheet" href="/static/vendor/glass/tokens.css" />
+    <link rel="stylesheet" href="/static/vendor/glass/textify.css" />
+    <link rel="stylesheet" href="/static/vendor/glass/primitives.css" />
+    <link rel="stylesheet" href="/static/app.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <a class="brand" href="/">TEXTIFY <span>2.2</span></a
+        ><button id="theme" class="quiet" type="button" aria-pressed="false">
+          Light theme
+        </button>
+      </header>
+      <section class="hero">
+        <p class="eyebrow">EVIDENCE-FIRST STUDY WORKSPACE</p>
+        <h1>Ask your documents.<br /><em>See the evidence.</em></h1>
+        <p>
+          Find relevant passages and ask for a cited answer. Check each
+          generated claim against the source excerpts below.
+        </p>
+      </section>
+      <section class="access panel">
+        <p class="eyebrow">PRIVATE WORKSPACE</p>
+        <form id="unlock">
+          <label for="access-code"
+            >Access code
+            <span>stored only for this browser session</span></label
+          ><input
+            id="access-code"
+            type="password"
+            autocomplete="off"
+            placeholder="Enter your private access code"
+          /><button>Unlock workspace</button
+          ><button id="lock" class="quiet" type="button">Lock workspace</button>
+        </form>
+        <p id="access-status" class="status" role="status">
+          A code protects document names, uploads, and model requests.
+        </p>
+      </section>
+      <section class="grid">
+        <article class="panel">
+          <p class="eyebrow">01 · INDEX</p>
+          <h2>Add a source</h2>
+          <form id="upload">
+            <label for="file">PDF, DOCX, or TXT source</label
+            ><input
+              id="file"
+              type="file"
+              accept=".pdf,.docx,.txt"
+              required
+            /><button>Build evidence index</button>
+          </form>
+          <p id="upload-status" class="status" role="status">
+            PDF, DOCX, TXT · max 3 MB · 3 uploads per hour
+          </p>
+        </article>
+        <article class="panel">
+          <p class="eyebrow">02 · RETRIEVE</p>
+          <h2>Ask precisely</h2>
+          <label for="documents">Indexed source</label
+          ><select id="documents">
+            <option value="">
+              Enter the access code to load sources
+            </option></select
+          ><button id="remove" class="quiet" type="button" disabled>
+            Remove source
+          </button>
+          <form id="ask">
+            <label for="question">Question</label
+            ><textarea
+              id="question"
+              minlength="6"
+              maxlength="500"
+              placeholder="What does this document conclude about…"
+              required
+            ></textarea
+            ><button>Find supported answer</button>
+          </form>
+          <p id="ask-status" class="status" role="status">
+            12 questions per hour per client. Answers are capped at 350 tokens.
+          </p>
+        </article>
+      </section>
+      <section id="answer" class="answer hidden">
+        <p class="eyebrow">03 · GROUNDED ANSWER</p>
+        <div id="answer-text"></div>
+        <div id="citations" class="citations"></div>
+      </section>
+      <section class="principles">
+        <div>
+          <b>Chunked</b
+          ><span>Sentence-aware overlap keeps context intact.</span>
+        </div>
+        <div>
+          <b>Semantic</b><span>pgvector ranks meaning, not only keywords.</span>
+        </div>
+        <div>
+          <b>Cited</b><span>Every answer exposes its retrieved evidence.</span>
+        </div>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
 </html>

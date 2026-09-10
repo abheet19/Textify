@@ -1,36 +1,42 @@
 """Textify: a citation-first study RAG workspace with paid-endpoint guardrails."""
+
 from __future__ import annotations
 
 import io
 import logging
 import math
 import os
+import re
 import time
 import uuid
 import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Annotated
 
 import requests
 from docx import Document as DocxDocument
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pgvector.sqlalchemy import Vector
 from pydantic import BaseModel, Field
 from pypdf import PdfReader
 from sqlalchemy import ForeignKey, String, Text, create_engine, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import DeclarativeBase, Mapped, relationship, mapped_column, sessionmaker
-from pgvector.sqlalchemy import Vector
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
-from .guard import require_access_code, require_paid_access
-from .rag import MAX_ANSWER_TOKENS, chunk_text, grounded_answer, source_fingerprint
+from .guard import require_access_code, require_paid_access, validate_access_code
+from .rag import MAX_ANSWER_TOKENS, chunk_text, grounded_answer, legacy_source_fingerprint, source_fingerprint
 
 logger = logging.getLogger("uvicorn.error")
 RELEASE_SHA = os.getenv("TEXTIFY_RELEASE_SHA", "unknown")
 
 MAX_UPLOAD_BYTES = 3 * 1024 * 1024
+# Bound multipart framing as well as the file. The route still enforces the
+# exact file limit after parsing.
+MAX_UPLOAD_REQUEST_BYTES = MAX_UPLOAD_BYTES + 64 * 1024
 MAX_EXTRACTED_CHARS = 120_000
 MAX_PDF_PAGES = 200
 MAX_DOCX_UNCOMPRESSED_BYTES = 12 * 1024 * 1024
@@ -61,7 +67,7 @@ class StudyDocument(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     name: Mapped[str] = mapped_column(String(255))
     fingerprint: Mapped[str] = mapped_column(String(64), unique=True, index=True)
-    chunks: Mapped[list["StudyChunk"]] = relationship(back_populates="document", cascade="all, delete-orphan")
+    chunks: Mapped[list[StudyChunk]] = relationship(back_populates="document", cascade="all, delete-orphan")
 
 
 class StudyChunk(Base):
@@ -84,6 +90,7 @@ async def lifespan(_: FastAPI):
         Base.metadata.create_all(engine)
         if EMBEDDING_PROVIDER == "local":
             from .local_embeddings import warm_model
+
             warm_model()
     yield
 
@@ -97,6 +104,74 @@ app.add_middleware(
     allow_headers=["content-type", "x-textify-access-code"],
 )
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "web"), name="static")
+
+
+class UploadGateMiddleware:
+    """Authenticate and cap upload bodies before multipart parsing can spool them."""
+
+    def __init__(self, application, max_body_bytes: int) -> None:
+        self.application = application
+        self.max_body_bytes = max_body_bytes
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] != "http" or scope["method"] != "POST" or scope["path"] != "/api/documents":
+            await self.application(scope, receive, send)
+            return
+
+        headers = {name.lower(): value for name, value in scope.get("headers", [])}
+        try:
+            validate_access_code(headers.get(b"x-textify-access-code", b"").decode("utf-8", errors="ignore"))
+        except HTTPException as error:
+            await JSONResponse({"detail": error.detail}, status_code=error.status_code, headers=error.headers)(
+                scope, receive, send
+            )
+            return
+
+        content_length = headers.get(b"content-length")
+        if content_length:
+            try:
+                if int(content_length) > self.max_body_bytes:
+                    await JSONResponse(
+                        {"detail": "Upload request exceeds the safe processing limit."}, status_code=413
+                    )(scope, receive, send)
+                    return
+            except ValueError:
+                await JSONResponse({"detail": "Invalid Content-Length header."}, status_code=400)(scope, receive, send)
+                return
+
+        consumed = 0
+        exceeded = False
+
+        async def limited_receive():
+            nonlocal consumed, exceeded
+            message = await receive()
+            if message["type"] == "http.request":
+                consumed += len(message.get("body", b""))
+                if consumed > self.max_body_bytes:
+                    exceeded = True
+                    raise UploadBodyTooLarge
+            return message
+
+        async def limited_send(message):
+            if not exceeded:
+                await send(message)
+
+        try:
+            await self.application(scope, limited_receive, limited_send)
+        except UploadBodyTooLarge:
+            pass
+        if exceeded:
+            logger.warning("upload_body_limit_exceeded path=/api/documents")
+            await JSONResponse({"detail": "Upload request exceeds the safe processing limit."}, status_code=413)(
+                scope, receive, send
+            )
+
+
+class UploadBodyTooLarge(Exception):
+    """Internal signal used before request parsing creates an UploadFile."""
+
+
+app.add_middleware(UploadGateMiddleware, max_body_bytes=MAX_UPLOAD_REQUEST_BYTES)
 
 
 @app.middleware("http")
@@ -153,6 +228,7 @@ def extract(upload: UploadFile, data: bytes) -> str:
 def embed(texts: list[str], *, query: bool = False) -> list[list[float]]:
     if EMBEDDING_PROVIDER == "local":
         from .local_embeddings import local_embed
+
         return local_embed(texts, query=query)
     key = os.environ.get("OPENAI_API_KEY")
     if not key:
@@ -174,7 +250,14 @@ def embed(texts: list[str], *, query: bool = False) -> list[list[float]]:
             if [item["index"] for item in ordered] != list(range(len(batch))):
                 raise ValueError("Embedding indices do not match the input batch.")
             batch_vectors = [item["embedding"] for item in ordered]
-            if any(len(vector) != 1536 or any(isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) for value in vector) for vector in batch_vectors):
+            if any(
+                len(vector) != 1536
+                or any(
+                    isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
+                    for value in vector
+                )
+                for vector in batch_vectors
+            ):
                 raise ValueError("Invalid embedding shape or values.")
         except requests.Timeout as error:
             raise HTTPException(504, "The embedding provider timed out. Try again later.") from error
@@ -206,13 +289,23 @@ def health():
     }
 
 
+def valid_release_sha(value: str) -> bool:
+    return bool(re.fullmatch(r"[0-9a-f]{40}", value))
+
+
 @app.get("/ready")
 def ready():
+    public_runtime = os.getenv("TEXTIFY_REQUIRE_ACCESS_CODE", "").lower() in {"1", "true"} or bool(
+        os.getenv("FLY_APP_NAME")
+    )
+    if public_runtime and not valid_release_sha(RELEASE_SHA):
+        raise HTTPException(503, "Release identity is not configured.")
     try:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
         if EMBEDDING_PROVIDER == "local":
             from .local_embeddings import warm_model
+
             warm_model()
     except Exception as error:
         raise HTTPException(503, "Workspace dependencies are not ready.") from error
@@ -228,7 +321,7 @@ def list_documents(request: Request):
 
 
 @app.post("/api/documents", status_code=201)
-def ingest_document(request: Request, file: UploadFile = File(...)):
+def ingest_document(request: Request, file: Annotated[UploadFile, File()]):
     require_paid_access(request, "upload")
     # Synchronous parser/DB/provider work belongs in FastAPI's thread pool.
     data = file.file.read(MAX_UPLOAD_BYTES + 1)
@@ -239,27 +332,38 @@ def ingest_document(request: Request, file: UploadFile = File(...)):
     except HTTPException:
         raise
     except Exception as error:
-        raise HTTPException(400, "This file could not be read. Upload a valid, unencrypted PDF, DOCX, or UTF-8 TXT file.") from error
+        raise HTTPException(
+            400, "This file could not be read. Upload a valid, unencrypted PDF, DOCX, or UTF-8 TXT file."
+        ) from error
     chunks = chunk_text(content)
     if not chunks:
         raise HTTPException(400, "No usable text was found in this document.")
     if len(chunks) > MAX_CHUNKS:
         raise HTTPException(400, f"Document creates more than {MAX_CHUNKS} chunks.")
     if any(len(chunk.text.encode("utf-8")) > MAX_CHUNK_BYTES for chunk in chunks):
-        raise HTTPException(400, "A passage exceeds the safe indexing size. Use shorter words or smaller source sections.")
+        raise HTTPException(
+            400, "A passage exceeds the safe indexing size. Use shorter words or smaller source sections."
+        )
     fingerprint = source_fingerprint(content)
+    compatible_fingerprints = (fingerprint, legacy_source_fingerprint(content))
     with SessionLocal() as session:
-        existing = session.query(StudyDocument).filter_by(fingerprint=fingerprint).first()
+        existing = session.query(StudyDocument).filter(StudyDocument.fingerprint.in_(compatible_fingerprints)).first()
         if existing:
             return {"id": existing.id, "name": existing.name, "chunks": len(existing.chunks), "deduplicated": True}
-        vectors = embed([chunk.text for chunk in chunks])
-        raw_name = Path((file.filename or "document").replace("\\", "/")).name
-        safe_name = "".join(character for character in raw_name if character.isprintable()).strip()[:255] or "document"
+
+    # Provider inference can take seconds. Never hold a pooled database
+    # connection while waiting for it.
+    vectors = embed([chunk.text for chunk in chunks])
+    raw_name = Path((file.filename or "document").replace("\\", "/")).name
+    safe_name = "".join(character for character in raw_name if character.isprintable()).strip()[:255] or "document"
+    with SessionLocal() as session:
         doc = StudyDocument(id=str(uuid.uuid4()), name=safe_name, fingerprint=fingerprint)
         session.add(doc)
         session.add_all(
-            StudyChunk(id=str(uuid.uuid4()), document=doc, position=chunk.position, content=chunk.text, embedding=vector)
-            for chunk, vector in zip(chunks, vectors)
+            StudyChunk(
+                id=str(uuid.uuid4()), document=doc, position=chunk.position, content=chunk.text, embedding=vector
+            )
+            for chunk, vector in zip(chunks, vectors, strict=True)
         )
         try:
             session.commit()
@@ -280,8 +384,10 @@ def ask_question(request: Request, payload: AskRequest):
     with SessionLocal() as session:
         if session.get(StudyDocument, payload.document_id) is None:
             raise HTTPException(404, "Document not found.")
-        require_paid_access(request, "ask")
-        query = embed([payload.question], query=True)[0]
+
+    require_paid_access(request, "ask")
+    query = embed([payload.question], query=True)[0]
+    with SessionLocal() as session:
         rows = (
             session.query(StudyChunk)
             .filter_by(document_id=payload.document_id)

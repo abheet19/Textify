@@ -1,6 +1,26 @@
 {
+  "name": "textify-release-tooling",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare": "husky",
+    "lint": "npm run lint:python && npm run lint:web",
+    "lint:python": "python -m ruff check --no-cache app/main.py app/guard.py app/rag.py app/local_embeddings.py tests tools/build-demo-gif.py",
+    "lint:web": "eslint app/web/app.js tools/*.mjs",
+    "format": "python -m ruff format --no-cache app/main.py app/guard.py app/rag.py app/local_embeddings.py tests tools/build-demo-gif.py && prettier --write app/web/index.html app/web/app.js app/web/app.css eslint.config.js package.json .github/workflows/*.yml",
+    "format:check": "python -m ruff format --check --no-cache app/main.py app/guard.py app/rag.py app/local_embeddings.py tests tools/build-demo-gif.py && prettier --check app/web/index.html app/web/app.js app/web/app.css eslint.config.js package.json .github/workflows/*.yml",
+    "test": "python -m pytest -q --tb=short",
+    "precommit": "npm run lint && npm run format:check && python -m compileall -q app tests"
+  },
   "dependencies": {
-    "@neon/config": "^1.3.1",
-    "@neon/env": "^1.2.2"
+    "@neon/config": "1.3.1",
+    "@neon/env": "1.2.2"
+  },
+  "devDependencies": {
+    "axe-core": "4.13.0",
+    "eslint": "10.10.0",
+    "husky": "9.1.7",
+    "playwright": "1.63.0",
+    "prettier": "3.9.6"
   }
 }

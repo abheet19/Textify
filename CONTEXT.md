@@ -1,34 +1,120 @@
 # Textify context
 
-This is the compact source of truth for engineers and coding agents. Read it with `README.md` and `docs/TESTING.md` before changing the product.
+This is the compact source of truth for engineers and coding agents. Read it with `README.md`, `MEMORY.md`, and `docs/TESTING.md` before changing the product. Git, GitHub Actions, and the live `/health` response are authoritative for exact release identity; prose is never proof that a commit was published.
 
-> Release snapshot, checked 10 September 2026 IST: the local metadata/favicon candidate is `feb6df3ce73f681ca1b4d376d8df198f8d2e901c`, one application commit ahead of public `master` and the verified Fly v11 release at `629511776ff5ba71b35974991f78ebefa71dc3b3`. This documentation-only commit is layered on that candidate. Current `/health` and `/ready` responses return HTTP 200 and report `6295117...`; neither local commit is pushed or deployed. The application candidate passed focused root/metadata/favicon checks and bounded mobile/desktop Lighthouse runs, but its broader pytest invocation did not terminate after teardown, so the 30/30 full-suite result applies to the live release tree rather than this candidate.
+## Product contract
 
-## Product boundary
+Textify is a private, single-user, citation-first RAG study workspace. A learner unlocks one shared workspace, indexes a PDF, DOCX, or TXT source, selects that source, asks a question, checks an answer against four retrieved passages, and can delete the source. It is deliberately small: no accounts, tenant isolation, OCR, background jobs, URL ingestion, quiz generation, glossary generation, or export workflow is part of the active FastAPI product.
 
-Textify is a private, single-user, citation-first RAG workspace for PDF, DOCX, and TXT study material. A user unlocks the workspace with one access code, uploads a source, asks a question, sees a concise answer and the four retrieved passages, and can delete the source. It is not a multi-tenant document SaaS and it does not claim automatic factual correctness.
+The preferred deployment creates embeddings locally with a pinned quantized `BAAI/bge-small-en-v1.5` ONNX model. It needs no embedding API key and incurs no hosted embedding call. Claude or OpenAI generation is optional and can cost money. Without a generation key, Textify returns retrieved evidence explicitly as `evidence-only`.
 
-The preferred production path uses the pinned `BAAI/bge-small-en-v1.5` ONNX model locally. Embedding calls therefore have no hosted API cost. Claude generation is optional; without a generation key, Textify returns retrieved evidence instead of fabricating an answer. The OpenAI embedding space remains an explicit alternative and uses separate tables so incompatible vectors never mix.
+## User states and CTAs
 
-## Runtime flow
+| State or control | Expected behavior |
+| --- | --- |
+| `Light theme` / `Dark theme` | switches theme, persists only the theme preference, and exposes `aria-pressed` |
+| Access code + `Unlock workspace` | lists sources on success; shows an in-page 401/503 message on failure; stores the code in `sessionStorage`, never `localStorage` |
+| `Lock workspace` | aborts pending browser work, removes the session code, hides sources and evidence, and prevents stale responses from reappearing |
+| File picker + `Build evidence index` | accepts PDF/DOCX/TXT, shows busy/success/deduplicated/error states, then selects the indexed source |
+| Indexed source selector | changes the active document, enables deletion, clears old evidence, and cancels an obsolete ask |
+| `Remove source` | cancel leaves data intact; accept deletes the document and cascading chunks, then clears evidence |
+| Question + `Find supported answer` | validates selection/question, retrieves within the selected document, renders answer/citations as text, and recovers from provider errors |
 
-1. `app/web/app.js` sends the browser-session access code in `X-Textify-Access-Code`.
-2. `app/guard.py` fails closed when production lacks a configured code and applies process-local upload/question budgets.
-3. `app/main.py` bounds the compressed upload, expanded DOCX, PDF pages, extracted text, chunks, passage bytes, and question length before provider or database work.
-4. `app/rag.py` creates overlapping sentence-aware chunks and isolates retrieved text as untrusted prompt data.
-5. `app/local_embeddings.py` serializes CPU inference and loads only the model baked into the image at its immutable revision.
-6. PostgreSQL with pgvector stores source metadata, chunks, and vectors. Local BGE and OpenAI vectors use distinct table pairs.
-7. The ask route retrieves four chunks by cosine distance. Claude or OpenAI may synthesize a cited answer; otherwise the route returns evidence-only mode.
+## Request and data flow
 
-## Release invariants
+```text
+browser
+  -> pre-body upload gate: access-code check + raw request cap
+  -> FastAPI route validation and per-client process-local budget
+  -> bounded extraction: PDF / DOCX / UTF-8 TXT
+  -> normalized full SHA-256 dedupe (legacy 16-hex fingerprints remain readable)
+  -> sentence-aware chunks: 180 words, 36-word overlap
+  -> local BGE passage vectors (384d) or optional OpenAI vectors (1536d)
+  -> short PostgreSQL/pgvector transaction
 
-- `requirements.txt` and `requirements-local.txt` must pass `pip-audit` and `pip check`.
-- Both images run as UID/GID 10001 and keep application code read-only.
-- Every image carries `org.opencontainers.image.revision`; `/health` and `/ready` report the same `TEXTIFY_RELEASE_SHA`.
-- The local image build performs real BGE inference and a small semantic-ordering check.
-- CI uses disposable pgvector, synthetic provider responses, a real browser, and a real local-model container upload/ask/delete flow.
-- Production deploy is manual after CI and defaults to `fly.local-embeddings.toml`.
+question
+  -> short existence check -> query embedding outside DB session
+  -> selected-document cosine top four -> close DB session
+  -> escaped, explicitly untrusted evidence
+  -> optional grounded generation or evidence-only response
+  -> textContent rendering with visible citations
+```
+
+Provider and CPU inference must never hold a database connection. Local and OpenAI embeddings use separate table pairs and must never be mixed.
+
+## Active code map
+
+| Path | Responsibility |
+| --- | --- |
+| `app/main.py` | ASGI upload gate, FastAPI lifespan/middleware/routes, parsers/bounds, ORM, provider selection, health/readiness |
+| `app/guard.py` | constant-time shared-code validation and rolling upload/question budgets |
+| `app/rag.py` | normalization, chunking, compatible fingerprints, prompt isolation, answer-provider schema validation |
+| `app/local_embeddings.py` | pinned offline BGE load, query/passage encoding, shape checks, serialized inference |
+| `app/web/index.html` | semantic one-page UI and form labels/status regions |
+| `app/web/app.js` | locked/unlocked state machine, request cancellation/versioning, safe rendering, theme state |
+| `app/web/app.css` + vendored Glass CSS | responsive visual layer and focus/control styles |
+| `tests/` | unit, security, PostgreSQL/pgvector integration, provider failure, file-boundary, and browser contracts |
+| `tools/verify-browser.mjs` | real Chromium CTA, 1280px/320px, injection, stale-response, and axe WCAG checks |
+| `Dockerfile*`, `fly*.toml` | fail-closed provider and preferred local-BGE production images/Fly shape |
+| `.github/workflows/ci.yml` | lint/format/audit, disposable pgvector, browser, exact-image, and local-BGE container gates |
+| `.github/workflows/fly-deploy.yml` | manual verify-before-deploy workflow and exact live SHA check |
+
+`app/service.py`, `app/templates/`, older `app/static/`, `run.py`, and `config.py` are retained historical Flask/TextRank artifacts. They are outside `app.main:app` and the production images. Do not infer current features from them.
+
+## Enforced limits
+
+| Boundary | Value |
+| --- | ---: |
+| raw multipart request | 3 MiB file plus 64 KiB framing allowance |
+| file content | 3 MiB |
+| PDF | 200 pages |
+| expanded DOCX members | 12 MiB |
+| extracted text | 120,000 characters |
+| chunks / passage bytes | 120 / 4,096 |
+| OpenAI embedding batch | 32 |
+| question | 6–500 characters |
+| retrieved evidence | top 4 passages |
+| generated answer | 350 tokens |
+| process-local budgets | 3 uploads/hour and 12 asks/hour per client |
+
+Production images set `TEXTIFY_REQUIRE_ACCESS_CODE=1`. Upload authentication runs before multipart parsing, so an anonymous body is rejected without being spooled. Oversized `Content-Length` and chunked bodies are bounded before an `UploadFile` exists. Public readiness also requires a lowercase 40-character Git SHA. Responses are `no-store` and include CSP, framing, MIME, referrer, and browser-permission restrictions. Source text and filenames are rendered as text.
+
+## Engineering and interview concepts
+
+- **Python/FastAPI:** ASGI receive/send middleware, dependency-free guards, Pydantic request contracts, thread-pool execution for synchronous routes, typed ORM models, exception-to-HTTP mapping.
+- **RAG/NLP:** normalization, overlapping chunk windows, query-versus-passage embeddings, cosine distance, retrieval scope, grounded prompting, abstaining with evidence-only output.
+- **DSA:** linear chunking and hashing; deque-based amortized O(1) rolling windows; top-k vector ordering over a bounded per-document set; uniqueness for idempotency and race recovery.
+- **JavaScript:** DOM state machine, `AbortController`, stale-result version tokens, safe `textContent`, `FormData`, async error recovery, session/local storage boundaries.
+- **TypeScript:** N/A in the shipped frontend; it is plain browser JavaScript. A TS migration is optional and should be justified by growing state/contracts, not claimed as current work.
+- **Framework state libraries:** N/A; the page is small enough for explicit DOM state. React/Redux would add cost without solving a measured problem.
+
+## Verification and release
+
+Install Python and Node dependencies, run `npm run precommit`, then run pytest with a disposable PostgreSQL 17 + pgvector database and `TEXTIFY_RUN_BROWSER_TESTS=1`. CI independently repeats lint, format, dependency audits, full host/browser tests, exact image builds, non-root/read-only assertions, real local BGE inference, and a container upload → ask → delete flow using synthetic data and no hosted provider.
+
+Fly deployment is manual and defaults to `fly.local-embeddings.toml`. A release is complete only when the source SHA, successful CI SHA, image revision, Fly release, `/health.release`, and `/ready.release` agree. Preserve the previous verified image/config for rollback. Never use production data for tests or print the private access code.
+
+## Accessibility and performance boundary
+
+The automated browser gate checks semantic structure, labels/names, duplicate IDs, state semantics, keyboard focus reachability, 24 CSS-pixel target minimums, 320px reflow, and axe WCAG 2 A/AA through 2.2 AA in desktop cited-answer and mobile locked states. This is automated conformance evidence, not WCAG certification or a screen-reader audit. Cross-browser and manual assistive-technology checks remain open.
+
+The static UI has no framework runtime, and requests are bounded. Historical Lighthouse and Fly timing samples are documented as point measurements only. Field Core Web Vitals, sustained load, scroll-jank distributions, database capacity, cold-start percentiles, and an SLO are not established.
 
 ## Known limits
 
-The access code represents one shared workspace. Budgets are per process and reset on restart. Scanned PDFs need OCR. Citations identify chunks rather than page coordinates. BGE inputs can truncate token-dense passages. Prompt isolation reduces injection risk but is not a proof of answer accuracy. There is no broad retrieval benchmark, distributed rate limiter, multi-user load test, or independent security audit.
+- Shared-code access is not user identity, tenancy, recovery, revocation, or row ownership.
+- Budgets live in one process, reset on restart, and are not provider billing caps.
+- Startup uses `create_all`; there is no schema-migration or restore drill yet.
+- Scanned PDFs need OCR. Citations identify chunks, not page coordinates.
+- Word-bounded chunks can still exceed BGE's effective tokenizer window and truncate token-dense text.
+- Prompt isolation and visible evidence reduce risk; they do not prove answer correctness or citation entailment.
+- No labeled retrieval benchmark, multilingual matrix, sustained concurrency/load test, independent security audit, field telemetry, or hosted error dashboard is claimed.
+
+## Rules for the next coding agent
+
+1. Preserve the active product boundary and distinguish historical Flask files from shipped code.
+2. Keep access-before-body parsing, bounded inputs, short DB sessions, atomic writes, embedding-space isolation, provider-schema checks, request cancellation, and text-only rendering.
+3. Use synthetic data and disposable pgvector. Never read, log, copy, or commit the private access-code file.
+4. Do not convert automated axe/Lighthouse checks into a WCAG certification claim.
+5. Measure retrieval quality or capacity before claiming accuracy, scale, or latency percentiles.
+6. Update `MEMORY.md`, tests, usage docs, and exact release evidence when behavior or release state changes.

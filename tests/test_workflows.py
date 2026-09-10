@@ -10,7 +10,10 @@ from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 from app.rag import chunk_text, grounded_answer, prompt
 
-SOURCE = "Privacy keeps the private key with the learner. The evaluator receives only encrypted values and a public key. " * 30
+SOURCE = (
+    "Privacy keeps the private key with the learner. The evaluator receives only encrypted values and a public key. "
+    * 30
+)
 
 
 def fixture_file(extension):
@@ -24,8 +27,16 @@ def fixture_file(extension):
     else:
         writer = PdfWriter()
         page = writer.add_blank_page(width=612, height=792)
-        font = DictionaryObject({NameObject("/Type"): NameObject("/Font"), NameObject("/Subtype"): NameObject("/Type1"), NameObject("/BaseFont"): NameObject("/Helvetica")})
-        page[NameObject("/Resources")] = DictionaryObject({NameObject("/Font"): DictionaryObject({NameObject("/F1"): writer._add_object(font)})})
+        font = DictionaryObject(
+            {
+                NameObject("/Type"): NameObject("/Font"),
+                NameObject("/Subtype"): NameObject("/Type1"),
+                NameObject("/BaseFont"): NameObject("/Helvetica"),
+            }
+        )
+        page[NameObject("/Resources")] = DictionaryObject(
+            {NameObject("/Font"): DictionaryObject({NameObject("/F1"): writer._add_object(font)})}
+        )
         stream = DecodedStreamObject()
         stream.set_data(f"BT /F1 11 Tf 50 740 Td ({SOURCE}) Tj ET".encode())
         page[NameObject("/Contents")] = writer._add_object(stream)
@@ -48,7 +59,11 @@ def test_real_database_upload_dedupe_retrieve_delete(workspace, extension):
     duplicate = w.client.post("/api/documents", headers=w.headers, files={"file": (f"again.{extension}", body)})
     assert duplicate.json()["id"] == doc["id"] and duplicate.json()["deduplicated"]
     assert len(w.calls) == count
-    answer = w.client.post("/api/ask", headers=w.headers, json={"question": "How does privacy protect the learner?", "document_id": doc["id"]})
+    answer = w.client.post(
+        "/api/ask",
+        headers=w.headers,
+        json={"question": "How does privacy protect the learner?", "document_id": doc["id"]},
+    )
     assert answer.status_code == 200, answer.text
     assert "[S1]" in answer.json()["answer"]
     assert all("Privacy" in citation["text"] for citation in answer.json()["citations"])
@@ -58,16 +73,34 @@ def test_real_database_upload_dedupe_retrieve_delete(workspace, extension):
     with w.main.SessionLocal() as session:
         assert session.query(w.main.StudyChunk).count() == 0
     count = len(w.calls)
-    assert w.client.post("/api/ask", headers=w.headers, json={"question": "Where is the private key?", "document_id": doc["id"]}).status_code == 404
+    assert (
+        w.client.post(
+            "/api/ask", headers=w.headers, json={"question": "Where is the private key?", "document_id": doc["id"]}
+        ).status_code
+        == 404
+    )
     assert len(w.calls) == count
 
 
-@pytest.mark.parametrize("filename,data,status", [
-    ("bad.pdf", b"not a PDF", 400), ("bad.docx", b"not a zip", 400),
-    ("empty.txt", b"", 400), ("script.html", b"<script>bad</script>", 415),
-    ("tiny.txt", b"too short", 400), ("big.txt", b"x" * (3 * 1024 * 1024 + 1), 400),
-    ("oversize-word.txt", ("x" * 5000 + " valid words enough for this document to create one complete retrievable source passage").encode(), 400),
-], ids=["malformed-pdf", "malformed-docx", "empty", "unsupported", "no-usable-text", "oversized", "oversized-passage"])
+@pytest.mark.parametrize(
+    "filename,data,status",
+    [
+        ("bad.pdf", b"not a PDF", 400),
+        ("bad.docx", b"not a zip", 400),
+        ("empty.txt", b"", 400),
+        ("script.html", b"<script>bad</script>", 415),
+        ("tiny.txt", b"too short", 400),
+        ("big.txt", b"x" * (3 * 1024 * 1024 + 1), 400),
+        (
+            "oversize-word.txt",
+            (
+                "x" * 5000 + " valid words enough for this document to create one complete retrievable source passage"
+            ).encode(),
+            400,
+        ),
+    ],
+    ids=["malformed-pdf", "malformed-docx", "empty", "unsupported", "no-usable-text", "oversized", "oversized-passage"],
+)
 def test_bad_files_never_call_provider(workspace, filename, data, status):
     result = workspace.client.post("/api/documents", headers=workspace.headers, files={"file": (filename, data)})
     assert result.status_code == status, result.text
@@ -76,25 +109,36 @@ def test_bad_files_never_call_provider(workspace, filename, data, status):
 
 def test_missing_embedding_key_leaves_database_empty(workspace, monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY")
-    result = workspace.client.post("/api/documents", headers=workspace.headers, files={"file": ("study.txt", SOURCE.encode())})
+    result = workspace.client.post(
+        "/api/documents", headers=workspace.headers, files={"file": ("study.txt", SOURCE.encode())}
+    )
     assert result.status_code == 503
     assert workspace.client.get("/api/documents", headers=workspace.headers).json() == []
 
 
-@pytest.mark.parametrize("failure,status", [(requests.Timeout("synthetic"), 504), (requests.ConnectionError("synthetic"), 502)])
+@pytest.mark.parametrize(
+    "failure,status", [(requests.Timeout("synthetic"), 504), (requests.ConnectionError("synthetic"), 502)]
+)
 def test_provider_network_failure_is_bounded_and_no_partial_document(workspace, monkeypatch, failure, status):
     def fail(*args, **kwargs):
         raise failure
+
     monkeypatch.setattr(workspace.main.requests, "post", fail)
-    result = workspace.client.post("/api/documents", headers=workspace.headers, files={"file": ("study.txt", SOURCE.encode())})
+    result = workspace.client.post(
+        "/api/documents", headers=workspace.headers, files={"file": ("study.txt", SOURCE.encode())}
+    )
     assert result.status_code == status
     assert "synthetic" not in result.text
     assert workspace.client.get("/api/documents", headers=workspace.headers).json() == []
 
 
-@pytest.mark.parametrize("data", [{"data": []}, {"data": [{"index": 0, "embedding": [0.0]}]}, {"data": [{"index": 2, "embedding": [0.0] * 1536}]}])
+@pytest.mark.parametrize(
+    "data",
+    [{"data": []}, {"data": [{"index": 0, "embedding": [0.0]}]}, {"data": [{"index": 2, "embedding": [0.0] * 1536}]}],
+)
 def test_partial_or_invalid_embedding_batch_rejected(monkeypatch, data):
     from app.main import embed
+
     monkeypatch.setenv("OPENAI_API_KEY", "synthetic")
     response = requests.Response()
     response.status_code = 200
@@ -125,10 +169,15 @@ def test_evidence_only_generation_without_keys():
 
 def test_unauthenticated_call_does_not_consume_budget(monkeypatch):
     from fastapi.testclient import TestClient
-    from app.main import app
+
     import app.guard as guard
+    from app.main import app
+
     monkeypatch.setenv("TEXTIFY_ACCESS_CODE", "required")
     with TestClient(app) as client:
         for _ in range(10):
-            assert client.post("/api/ask", json={"question": "Explain privacy?", "document_id": "0" * 36}).status_code == 401
+            assert (
+                client.post("/api/ask", json={"question": "Explain privacy?", "document_id": "0" * 36}).status_code
+                == 401
+            )
     assert not guard.budget._events

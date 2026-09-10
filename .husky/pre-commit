@@ -1,0 +1,7 @@
+if [ -x .venv/Scripts/python.exe ]; then
+  PATH="$PWD/.venv/Scripts:$PATH"
+elif [ -x .venv/bin/python ]; then
+  PATH="$PWD/.venv/bin:$PATH"
+fi
+
+npm run precommit

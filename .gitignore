@@ -134,6 +134,7 @@ test_*.txt
 *.bak
 *.tmp
 .neon
+.ruff_cache/
 
 # Local tooling created by Neon CLI / Codex; not part of the Python service.
 node_modules/

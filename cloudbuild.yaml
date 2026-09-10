@@ -1,24 +1,23 @@
 steps:
-  # Step 1: Build the Docker image with a unique tag
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/text-summarizer-bert/text-summarizer-bert:latest', '.']
+    args: ['build', '--build-arg', 'VCS_REF=$COMMIT_SHA', '-t', 'gcr.io/text-summarizer-bert/textify:$COMMIT_SHA', '.']
 
-  # Step 2: Push the Docker image with the unique tag
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/text-summarizer-bert/text-summarizer-bert:latest']
+    args: ['push', 'gcr.io/text-summarizer-bert/textify:$COMMIT_SHA']
 
-  # Step 3: Deploy the Docker image to Google Cloud Run
   - name: 'gcr.io/cloud-builders/gcloud'
     args: [
       'run', 'deploy', 'text-summarizer-bert',
-      '--image', 'gcr.io/text-summarizer-bert/text-summarizer-bert:latest',
+      '--image', 'gcr.io/text-summarizer-bert/textify:$COMMIT_SHA',
       '--platform', 'managed',
       '--region', 'europe-west1',
-      '--allow-unauthenticated'
+      '--allow-unauthenticated',
+      '--set-env-vars', 'TEXTIFY_REQUIRE_ACCESS_CODE=1',
+      '--set-secrets', 'TEXTIFY_ACCESS_CODE=textify-access-code:latest,OPENAI_API_KEY=textify-openai-api-key:latest'
     ]
 
 images:
-  - 'gcr.io/text-summarizer-bert/text-summarizer-bert:latest'
+  - 'gcr.io/text-summarizer-bert/textify:$COMMIT_SHA'
 
 timeout: '1600s'
 

@@ -1,9 +1,10 @@
 """Pinned, real semantic vectors on CPU. No hosted embedding API or runtime download."""
+
 from __future__ import annotations
 
-from functools import lru_cache
 import math
 import os
+from functools import lru_cache
 from pathlib import Path
 from threading import Lock
 
@@ -19,12 +20,15 @@ _initialization = Lock()
 @lru_cache(maxsize=1)
 def _load_model():
     from fastembed import TextEmbedding
+
     model_path = Path(os.getenv("TEXTIFY_LOCAL_MODEL_PATH", "/opt/textify-model"))
     if not (model_path / "model_optimized.onnx").is_file():
         raise RuntimeError("The pinned local model is missing from the image.")
     return TextEmbedding(
-        model_name=MODEL_NAME, specific_model_path=str(model_path),
-        local_files_only=True, threads=1,
+        model_name=MODEL_NAME,
+        specific_model_path=str(model_path),
+        local_files_only=True,
+        threads=1,
     )
 
 
@@ -41,7 +45,9 @@ def local_embed(texts: list[str], *, query: bool = False) -> list[list[float]]:
         model = warm_model()
         iterator = model.query_embed(texts, batch_size=1) if query else model.passage_embed(texts, batch_size=1)
         vectors = [[float(value) for value in vector] for vector in iterator]
-        if len(vectors) != len(texts) or any(len(vector) != DIMENSIONS or not all(math.isfinite(value) for value in vector) for vector in vectors):
+        if len(vectors) != len(texts) or any(
+            len(vector) != DIMENSIONS or not all(math.isfinite(value) for value in vector) for vector in vectors
+        ):
             raise RuntimeError("Local embeddings failed their shape check.")
         return vectors
     except HTTPException:

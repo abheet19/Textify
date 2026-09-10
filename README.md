@@ -60,9 +60,9 @@ flowchart LR
 
 ## Security, privacy, and spending controls
 
-- **Fail closed in production.** If a Fly deployment does not have `TEXTIFY_ACCESS_CODE`, upload, document-list, and ask endpoints return 503. A valid code is required when one is configured.
+- **Fail closed in production.** Both production images require `TEXTIFY_ACCESS_CODE`; public readiness also requires a full lowercase Git SHA. Upload authentication and a raw-body limit run before multipart parsing, so anonymous or oversized bodies cannot be spooled first.
 - **Private document inventory.** The code protects document names as well as paid model calls. The current schema is intentionally single-user; it is not a multi-tenant account system.
-- **Small predictable budgets.** Each client can upload three documents and ask twelve questions per hour per process. Uploads are capped at 3 MB, PDFs at 200 pages, expanded DOCX content at 12 MB, extracted text at 120,000 characters, chunks at 120, embeddings at 32 per batch, and generated answers at 350 tokens.
+- **Small predictable budgets.** Each client can upload three documents and ask twelve questions per hour per process. Uploads are capped before and after multipart parsing at 3 MB plus bounded framing, PDFs at 200 pages, expanded DOCX content at 12 MB, extracted text at 120,000 characters, chunks at 120, embeddings at 32 per batch, and generated answers at 350 tokens.
 - **Prompt-injection boundary.** Retrieved document excerpts are wrapped as untrusted data; the generation instruction says that they cannot override rules, request secrets, invoke tools, or justify unsupported claims. The answer always returns its cited chunks for human review.
 - **Local semantic indexing.** The deployed local mode uses a pinned, quantized BGE model on CPU; no OpenAI key or embedding API bill is needed. Claude generates the final answer using `ANTHROPIC_API_KEY`. The optional OpenAI mode remains available with its own 1,536-dimensional table pair; embeddings from different models are never mixed. Without a generation key, results are explicitly evidence-only.
 - **HTTP safeguards.** The app limits CORS to `CORS_ORIGINS` and sends a self-only content policy, framing and browser-permission restrictions, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: same-origin`.
@@ -104,12 +104,15 @@ Open `http://127.0.0.1:8000`.
 ## Verify
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest -q
+$env:PATH = (Resolve-Path .\.venv\Scripts).Path + ';C:\Program Files\nodejs;' + $env:PATH
+npm ci --ignore-scripts
+npm run precommit
+.\.venv\Scripts\python.exe -m pytest -q --tb=short
 ```
 
-The currently deployed `6295117...` release passed **30 tests**, including a real PostgreSQL/pgvector workflow and a Chromium browser flow with synthetic AI-provider responses. The local `feb6df3...` metadata/favicon candidate passed focused route checks and bounded mobile/desktop Lighthouse runs, but its broader pytest invocation did not terminate after teardown, so it has no fresh full-suite claim. Without `TEXTIFY_TEST_DATABASE_URL`, integration tests deliberately skip; an offline green run alone is not end-to-end evidence. CI provisions disposable pgvector, drives a real browser, builds both images, and runs the local image through a real upload, semantic retrieval, evidence-only answer, and deletion without a hosted AI call. See [`CONTEXT.md`](CONTEXT.md) and [`docs/TESTING.md`](docs/TESTING.md) for the compact architecture and release gates.
+Without `TEXTIFY_TEST_DATABASE_URL`, PostgreSQL/pgvector and browser cases deliberately skip; an offline green run alone is not end-to-end evidence. CI provisions disposable pgvector, runs the complete unit/integration suite, drives Chromium at 1280 and 320 CSS pixels, applies axe WCAG A/AA rules, audits dependencies, builds both images, and runs the local image through real BGE upload, semantic retrieval, evidence-only answer, and deletion without a hosted AI call. See [`CONTEXT.md`](CONTEXT.md), [`MEMORY.md`](MEMORY.md), and [`docs/TESTING.md`](docs/TESTING.md) for the exact boundaries and release gates.
 
-The browser checks cover unlock/lock, upload, duplicate detection, source selection, cited evidence, invalid files, rate limits, deletion, themes and mobile layout. They do not establish retrieval accuracy on an unseen corpus or multi-user load capacity.
+The browser checks cover every visible CTA and state: theme, wrong/correct unlock, lock, upload, duplicate detection, source selection, missing-selection feedback, cited evidence, injected markup, stale-response cancellation, invalid files, rate limits, delete cancel/accept, keyboard reachability, target sizes, and responsive containment. Automated axe evidence is not a WCAG certification or manual screen-reader result.
 
 ## Deploy to Fly.io
 
@@ -124,7 +127,7 @@ fly deploy --remote-only --config fly.local-embeddings.toml --app textify-abheet
 fly checks list --app textify-abheet19
 ```
 
-`/health` reports architecture and the deployed Git revision; `/ready` checks database connectivity and model availability and reports the same revision. GitHub deployment is manual and depends on the complete verification workflow. The retired GCP workflow is disabled. A push runs tests without unexpectedly replacing the live app. There is no installed pre-commit hook; local tests and CI are the actual gates.
+`/health` reports architecture and the deployed Git revision; `/ready` checks exact release identity, database connectivity, and model availability. GitHub deployment is manual and depends on the complete verification workflow. The legacy Cloud Build definition is fail-closed and commit-addressed, while Fly remains the supported production path. A push runs tests without unexpectedly replacing the live app. Husky runs the same lint, formatting, and compile gate available through `npm run precommit`.
 
 ## Current limits
 
@@ -133,7 +136,8 @@ fly checks list --app textify-abheet19
 - BGE's input is limited to approximately 512 model tokens. Word-bounded chunks can still truncate token-dense content; evaluation and tokenizer-aware chunking remain improvements.
 - A grounding prompt reduces risk but cannot guarantee factual accuracy or perfect citation entailment. The model has no tools or access to service secrets.
 - Request budgets are process-local and reset on restart. They are not a hard provider billing cap. One local inference runs at a time; busy requests receive a retryable 429.
-- No multi-user stress benchmark, independent security audit, or broad retrieval-quality evaluation is claimed.
+- Startup creates missing tables but has no schema-migration/restore system. A build-once, promote-by-digest pipeline remains future supply-chain hardening.
+- No multi-user stress benchmark, independent security audit, broad retrieval-quality evaluation, field Core Web Vitals, cross-browser matrix, manual screen-reader audit, or WCAG certification is claimed.
 
 ## Stack
 
