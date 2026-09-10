@@ -397,8 +397,20 @@ try {
     path: path.join(out, "textify-mobile-locked.png"),
     fullPage: true,
   });
+  const expectedConsoleStatusPattern =
+    /Failed to load resource: the server responded with a status of (401|415|429)\b/;
+  const expectedConsoleErrors = consoleErrors.filter((message) =>
+    expectedConsoleStatusPattern.test(message),
+  );
+  const expectedConsoleStatuses = expectedConsoleErrors
+    .map((message) => Number(message.match(expectedConsoleStatusPattern)[1]))
+    .sort((left, right) => left - right);
+  const unexpectedConsoleErrors = consoleErrors.filter(
+    (message) => !expectedConsoleStatusPattern.test(message),
+  );
   assert.deepEqual(errors, []);
-  assert.deepEqual(consoleErrors, []);
+  assert.deepEqual(expectedConsoleStatuses, [401, 415, 429]);
+  assert.deepEqual(unexpectedConsoleErrors, []);
   assert.deepEqual(requestFailures, []);
   await writeFile(
     path.join(out, "browser-results.json"),
@@ -408,7 +420,8 @@ try {
         count: checks.length,
         viewportCoverage: ["1280x900", "320x720"],
         errors,
-        consoleErrors,
+        expectedConsoleErrors,
+        unexpectedConsoleErrors,
         requestFailures,
         scope:
           "Real local UI/API/PostgreSQL pgvector with isolated synthetic data and mocked provider responses; no paid provider verification.",
@@ -418,7 +431,7 @@ try {
     ),
   );
   console.log(
-    `Textify browser: ${checks.length} workflows passed; no page, console, or request errors.`,
+    `Textify browser: ${checks.length} workflows passed; expected 401/415/429 diagnostics observed; no unexpected browser errors.`,
   );
 } finally {
   await browser.close();
