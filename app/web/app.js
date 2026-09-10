@@ -130,6 +130,7 @@ docs.onchange = () => {
 
 $("#upload").onsubmit = async (event) => {
   event.preventDefault();
+  const formElement = event.currentTarget;
   const status = $("#upload-status");
   const button = $("#upload button");
   const file = $("#file").files[0];
@@ -139,7 +140,7 @@ $("#upload").onsubmit = async (event) => {
   uploadController = controller;
   const version = workspaceVersion;
   button.disabled = true;
-  event.currentTarget.setAttribute("aria-busy", "true");
+  formElement.setAttribute("aria-busy", "true");
   status.textContent = "Indexing source…";
   const form = new FormData();
   form.append("file", file);
@@ -165,13 +166,14 @@ $("#upload").onsubmit = async (event) => {
     if (controller === uploadController) {
       uploadController = undefined;
       button.disabled = false;
-      event.currentTarget.removeAttribute("aria-busy");
+      formElement.removeAttribute("aria-busy");
     }
   }
 };
 
 $("#ask").onsubmit = async (event) => {
   event.preventDefault();
+  const formElement = event.currentTarget;
   const status = $("#ask-status");
   const button = $("#ask button");
   if (button.disabled) return;
@@ -184,7 +186,7 @@ $("#ask").onsubmit = async (event) => {
   askController = controller;
   const version = workspaceVersion;
   button.disabled = true;
-  event.currentTarget.setAttribute("aria-busy", "true");
+  formElement.setAttribute("aria-busy", "true");
   clearAnswer();
   status.textContent = "Finding evidence…";
   const selected = docs.value;
@@ -229,7 +231,7 @@ $("#ask").onsubmit = async (event) => {
     if (controller === askController) {
       askController = undefined;
       button.disabled = false;
-      event.currentTarget.removeAttribute("aria-busy");
+      formElement.removeAttribute("aria-busy");
     }
   }
 };
