@@ -97,6 +97,34 @@ def test_home_uses_external_assets_only(monkeypatch):
     assert b"<script>" not in response.content
 
 
+def test_mcp_manifest_describes_the_real_routes_and_current_auth_state(monkeypatch):
+    monkeypatch.setenv("TEXTIFY_SKIP_DB_INIT", "1")
+    monkeypatch.delenv("TEXTIFY_ACCESS_CODE", raising=False)
+    from app.main import app
+
+    with TestClient(app) as client:
+        response = client.get("/mcp/manifest.json")
+    assert response.status_code == 200
+    assert response.headers["Cache-Control"] == "no-store"
+    body = response.json()
+    assert body["name"] == "textify"
+    assert body["auth"] == {"type": "header", "header": "X-Textify-Access-Code", "required": False}
+    routes = {tool["name"]: tool["http"] for tool in body["tools"]}
+    assert routes["list_sources"] == {"method": "GET", "path": "/api/documents"}
+    assert routes["ask_question"]["method"] == "POST" and routes["ask_question"]["path"] == "/api/ask"
+    assert routes["remove_source"]["path"] == "/api/documents/{document_id}"
+
+
+def test_mcp_manifest_reflects_a_configured_access_code(monkeypatch):
+    monkeypatch.setenv("TEXTIFY_SKIP_DB_INIT", "1")
+    monkeypatch.setenv("TEXTIFY_ACCESS_CODE", "configured")
+    from app.main import app
+
+    with TestClient(app) as client:
+        response = client.get("/mcp/manifest.json")
+    assert response.json()["auth"]["required"] is True
+
+
 def test_release_identity_requires_an_exact_lowercase_git_sha():
     from app.main import valid_release_sha
 

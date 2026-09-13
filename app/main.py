@@ -312,6 +312,63 @@ def ready():
     return {"status": "ready", "release": RELEASE_SHA}
 
 
+@app.get("/mcp/manifest.json")
+def mcp_manifest():
+    """A static, honest description of this API for MCP-aware callers.
+
+    This is documentation, not a protocol server: it describes the exact
+    REST routes below (their real auth header, real budgets, real request
+    shape) so another agent in the same ecosystem — Vantage's MCP server,
+    or a future Command/Zeno orchestrator — can discover what Textify can
+    do without guessing at undocumented endpoints. Calling a tool still
+    means calling its listed HTTP route directly; every existing guardrail
+    (access code, rate budget, 3 MB/500-char caps) still applies there.
+    """
+    return {
+        "schema_version": "2024-11-05",
+        "name": "textify",
+        "description": "Evidence-first study workspace: index a private PDF/DOCX/TXT source, then ask cited questions.",
+        "ecosystem": "https://github.com/abheet19",
+        "auth": {
+            "type": "header",
+            "header": "X-Textify-Access-Code",
+            "required": bool(os.getenv("TEXTIFY_ACCESS_CODE")),
+        },
+        "tools": [
+            {
+                "name": "list_sources",
+                "description": "List the indexed documents in the caller's private workspace.",
+                "http": {"method": "GET", "path": "/api/documents"},
+            },
+            {
+                "name": "add_source",
+                "description": "Upload a PDF, DOCX, or TXT source (max 3 MB) to be chunked and embedded.",
+                "http": {"method": "POST", "path": "/api/documents", "content_type": "multipart/form-data"},
+                "budget": {"limit": 3, "window_seconds": 3600},
+            },
+            {
+                "name": "ask_question",
+                "description": "Ask a grounded, cited question against one indexed document.",
+                "http": {"method": "POST", "path": "/api/ask", "content_type": "application/json"},
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "document_id": {"type": "string", "minLength": 36, "maxLength": 36},
+                        "question": {"type": "string", "minLength": 6, "maxLength": 500},
+                    },
+                    "required": ["document_id", "question"],
+                },
+                "budget": {"limit": 12, "window_seconds": 3600},
+            },
+            {
+                "name": "remove_source",
+                "description": "Delete a document and its stored chunks/embeddings.",
+                "http": {"method": "DELETE", "path": "/api/documents/{document_id}"},
+            },
+        ],
+    }
+
+
 @app.get("/api/documents")
 def list_documents(request: Request):
     require_access_code(request)

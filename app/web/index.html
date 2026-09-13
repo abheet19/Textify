@@ -14,102 +14,252 @@
     <link rel="stylesheet" href="/static/vendor/glass/primitives.css" />
     <link rel="stylesheet" href="/static/app.css" />
   </head>
-  <body>
-    <main class="shell">
-      <header>
-        <a class="brand" href="/">TEXTIFY <span>2.2</span></a
-        ><button id="theme" class="quiet" type="button" aria-pressed="false">
-          Light theme
-        </button>
-      </header>
-      <section class="hero">
-        <p class="eyebrow">EVIDENCE-FIRST STUDY WORKSPACE</p>
-        <h1>Ask your documents.<br /><em>See the evidence.</em></h1>
-        <p>
-          Find relevant passages and ask for a cited answer. Check each
-          generated claim against the source excerpts below.
-        </p>
-      </section>
-      <section class="access panel">
-        <p class="eyebrow">PRIVATE WORKSPACE</p>
-        <form id="unlock">
-          <label for="access-code"
-            >Access code
-            <span>stored only for this browser session</span></label
-          ><input
-            id="access-code"
-            type="password"
-            autocomplete="off"
-            placeholder="Enter your private access code"
-          /><button>Unlock workspace</button
-          ><button id="lock" class="quiet" type="button">Lock workspace</button>
-        </form>
-        <p id="access-status" class="status" role="status">
-          A code protects document names, uploads, and model requests.
-        </p>
-      </section>
-      <section class="grid">
-        <article class="panel">
-          <p class="eyebrow">01 · INDEX</p>
-          <h2>Add a source</h2>
-          <form id="upload">
-            <label for="file">PDF, DOCX, or TXT source</label
-            ><input
-              id="file"
-              type="file"
-              accept=".pdf,.docx,.txt"
-              required
-            /><button>Build evidence index</button>
-          </form>
-          <p id="upload-status" class="status" role="status">
-            PDF, DOCX, TXT · max 3 MB · 3 uploads per hour
-          </p>
-        </article>
-        <article class="panel">
-          <p class="eyebrow">02 · RETRIEVE</p>
-          <h2>Ask precisely</h2>
-          <label for="documents">Indexed source</label
-          ><select id="documents">
-            <option value="">
-              Enter the access code to load sources
-            </option></select
-          ><button id="remove" class="quiet" type="button" disabled>
-            Remove source
+  <body class="glass-page glass-atmosphere">
+    <div class="app-shell">
+      <nav class="rail" aria-label="Section navigation">
+        <a class="brand" href="/">
+          <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 6h16M4 12h11M4 18h6" />
+            <circle
+              cx="20.5"
+              cy="18"
+              r="1.4"
+              fill="currentColor"
+              stroke="none"
+            />
+          </svg>
+          TEXTIFY <span>2.2</span>
+        </a>
+        <div class="rail-jump">
+          <a class="rail-btn" href="#access"
+            ><svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="10" width="16" height="10" rx="2" />
+              <path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg
+            ><span class="rail-tip">Access</span></a
+          >
+          <a class="rail-btn" href="#index"
+            ><svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"
+              />
+              <path d="M14 4v5h5" />
+              <path d="M8 13h8M8 17h5" /></svg
+            ><span class="rail-tip">Index</span></a
+          >
+          <a class="rail-btn" href="#retrieve"
+            ><svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 8.4 8.4 0 0 1-4-1L3 20l1.1-5.3A8.5 8.5 0 1 1 21 11.5Z"
+              /></svg
+            ><span class="rail-tip">Retrieve</span></a
+          >
+        </div>
+        <div class="rail-bottom">
+          <button
+            id="paletteToggle"
+            type="button"
+            class="rail-btn"
+            aria-haspopup="dialog"
+            aria-controls="cmdkOverlay"
+            aria-expanded="false"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="m7 9 3 3-3 3M12 15h5" /></svg
+            ><span class="rail-tip">Command palette · Ctrl K</span>
           </button>
-          <form id="ask">
-            <label for="question">Question</label
-            ><textarea
-              id="question"
-              minlength="6"
-              maxlength="500"
-              placeholder="What does this document conclude about…"
-              required
-            ></textarea
-            ><button>Find supported answer</button>
-          </form>
-          <p id="ask-status" class="status" role="status">
-            12 questions per hour per client. Answers are capped at 350 tokens.
+          <button id="theme" class="quiet" type="button" aria-pressed="false">
+            Light theme
+          </button>
+          <a
+            class="rail-btn"
+            href="https://github.com/abheet19"
+            target="_blank"
+            rel="noopener noreferrer"
+            ><svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.3 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.35 4.68-4.58 4.93.36.31.68.92.68 1.85v2.74c0 .26.18.58.69.48A10 10 0 0 0 12 2Z"
+              /></svg
+            ><span class="rail-tip">Textify on GitHub</span></a
+          >
+        </div>
+      </nav>
+
+      <div class="viewport">
+        <main class="shell">
+          <section class="hero">
+            <p class="eyebrow">EVIDENCE-FIRST STUDY WORKSPACE</p>
+            <h1>Ask your documents.<br /><em>See the evidence.</em></h1>
+            <p>
+              Find relevant passages and ask for a cited answer. Check each
+              generated claim against the source excerpts below.
+            </p>
+          </section>
+
+          <section id="access" class="access panel glass">
+            <p class="eyebrow">PRIVATE WORKSPACE</p>
+            <form id="unlock">
+              <label for="access-code"
+                >Access code
+                <span>stored only for this browser session</span></label
+              ><input
+                id="access-code"
+                type="password"
+                autocomplete="off"
+                placeholder="Enter your private access code"
+              /><button class="btn btn-primary">Unlock workspace</button
+              ><button id="lock" class="quiet" type="button">
+                Lock workspace
+              </button>
+            </form>
+            <p id="access-status" class="status" role="status">
+              A code protects document names, uploads, and model requests.
+            </p>
+          </section>
+
+          <section class="grid">
+            <article id="index" class="panel glass">
+              <p class="eyebrow">01 · INDEX</p>
+              <h2>Add a source</h2>
+              <form id="upload">
+                <label for="file" id="dropzone" class="dropzone">
+                  <span class="dropzone-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M12 16V4M7 9l5-5 5 5" />
+                      <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
+                    </svg>
+                  </span>
+                  <span class="dropzone-text">
+                    <b>Drag a file here, or click to browse</b>
+                    <span>PDF, DOCX, or TXT source</span>
+                  </span>
+                </label>
+                <input
+                  id="file"
+                  type="file"
+                  accept=".pdf,.docx,.txt"
+                  required
+                />
+                <div
+                  id="sourceCards"
+                  class="source-cards"
+                  aria-label="Indexed sources"
+                ></div>
+                <button class="btn btn-primary">Build evidence index</button>
+              </form>
+              <p id="upload-status" class="status" role="status">
+                PDF, DOCX, TXT · max 3 MB · 3 uploads per hour
+              </p>
+            </article>
+            <article id="retrieve" class="panel glass">
+              <p class="eyebrow">02 · RETRIEVE</p>
+              <h2>Ask precisely</h2>
+              <label for="documents">Indexed source</label
+              ><select id="documents">
+                <option value="">
+                  Enter the access code to load sources
+                </option></select
+              ><button id="remove" class="quiet" type="button" disabled>
+                Remove source
+              </button>
+              <form id="ask">
+                <label for="question">Question</label
+                ><textarea
+                  id="question"
+                  minlength="6"
+                  maxlength="500"
+                  placeholder="What does this document conclude about…"
+                  required
+                ></textarea
+                ><button class="btn btn-primary">Find supported answer</button>
+              </form>
+              <p id="ask-status" class="status" role="status">
+                12 questions per hour per client. Answers are capped at 350
+                tokens.
+              </p>
+              <p id="sessionMeta" class="session-meta"></p>
+            </article>
+          </section>
+
+          <section id="answer" class="answer panel glass hidden">
+            <div class="answer-head">
+              <p class="eyebrow">03 · GROUNDED ANSWER</p>
+              <button id="copyAnswer" class="quiet" type="button">
+                Copy answer
+              </button>
+            </div>
+            <div id="answer-text"></div>
+            <div id="citations" class="citations"></div>
+          </section>
+
+          <section class="principles">
+            <div class="glass">
+              <b>Chunked</b
+              ><span>Sentence-aware overlap keeps context intact.</span>
+            </div>
+            <div class="glass">
+              <b>Semantic</b
+              ><span>pgvector ranks meaning, not only keywords.</span>
+            </div>
+            <div class="glass">
+              <b>Cited</b
+              ><span>Every answer exposes its retrieved evidence.</span>
+            </div>
+          </section>
+        </main>
+
+        <footer class="ecosystem">
+          <a
+            class="ecosystem-badge"
+            href="https://github.com/abheet19"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.3 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.35 4.68-4.58 4.93.36.31.68.92.68 1.85v2.74c0 .26.18.58.69.48A10 10 0 0 0 12 2Z"
+              /></svg
+            >Built by <b>abheet19</b> · part of the Glass ecosystem
+          </a>
+          <p>
+            Textify shares its tokens, primitives, and contrast budget with
+            every other project at github.com/abheet19 — one design system, one
+            accent per theme.
           </p>
-        </article>
-      </section>
-      <section id="answer" class="answer hidden">
-        <p class="eyebrow">03 · GROUNDED ANSWER</p>
-        <div id="answer-text"></div>
-        <div id="citations" class="citations"></div>
-      </section>
-      <section class="principles">
-        <div>
-          <b>Chunked</b
-          ><span>Sentence-aware overlap keeps context intact.</span>
+        </footer>
+      </div>
+    </div>
+
+    <div class="cmdk-overlay" id="cmdkOverlay" hidden>
+      <div
+        class="cmdk glass"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
+      >
+        <div class="cmdk-input-row">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m21 21-4.3-4.3" /></svg
+          ><input
+            id="cmdkInput"
+            type="search"
+            placeholder="Jump to a section or run a command…"
+            aria-label="Filter commands"
+            autocomplete="off"
+          />
         </div>
-        <div>
-          <b>Semantic</b><span>pgvector ranks meaning, not only keywords.</span>
-        </div>
-        <div>
-          <b>Cited</b><span>Every answer exposes its retrieved evidence.</span>
-        </div>
-      </section>
-    </main>
+        <ul class="cmdk-list" id="cmdkList"></ul>
+      </div>
+    </div>
+
+    <div
+      class="toast-stack"
+      id="toastStack"
+      aria-live="polite"
+      aria-atomic="true"
+    ></div>
+
     <script src="/static/app.js"></script>
   </body>
 </html>
