@@ -203,6 +203,18 @@
                   >
                     Unlock workspace
                   </button>
+                  <div class="lock-demo-sep"><span>or</span></div>
+                  <button
+                    class="btn small lock-demo-btn"
+                    id="tryDemoBtn"
+                    type="button"
+                  >
+                    Try the read-only demo — no code needed
+                  </button>
+                  <p class="lock-demo-note">
+                    A seeded sample document you can query to watch the cited
+                    answer flow. Nothing is stored.
+                  </p>
                 </div>
 
                 <!-- Native select stays the accessible control of record; the
@@ -264,6 +276,24 @@
                       shows the passages it used.</span
                     >
                   </div>
+                </div>
+
+                <div class="demo-starters glass" id="demoStarters" hidden>
+                  <div class="demo-starters-head">
+                    <span class="demo-badge">Read-only demo</span>
+                    <span class="demo-starters-label"
+                      >Click an example question to run the cited-answer
+                      flow</span
+                    >
+                    <button
+                      class="btn small demo-exit"
+                      id="demoExitBtn"
+                      type="button"
+                    >
+                      Exit demo
+                    </button>
+                  </div>
+                  <div class="demo-starters-btns" id="demoStarterBtns"></div>
                 </div>
 
                 <form class="composer glass" id="composerForm">

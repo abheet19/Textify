@@ -80,5 +80,14 @@ def require_paid_access(request: Request, operation: str) -> None:
     budget.consume(client_key(request), operation, UPLOAD_BUDGET if operation == "upload" else ASK_BUDGET)
 
 
+def require_public_budget(request: Request, operation: str) -> None:
+    """Budget-limit a public (no access code) endpoint without gating on the code.
+
+    Used only by the read-only demo route so a reviewer needs no code, while the
+    paid answer provider is still protected by the same per-client burst budget.
+    """
+    budget.consume(client_key(request), operation, ASK_BUDGET)
+
+
 def content_fingerprint(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]

@@ -69,6 +69,21 @@ def test_chunked_upload_stops_receiving_at_the_raw_body_limit(monkeypatch):
     assert next(message for message in sent if message["type"] == "http.response.start")["status"] == 413
 
 
+def test_demo_ask_is_reachable_without_the_access_code(monkeypatch):
+    # With a code configured, the private ask stays 401 without it, but the
+    # public read-only demo route is reachable and only validates its input.
+    monkeypatch.setenv("TEXTIFY_ACCESS_CODE", "required")
+    monkeypatch.setenv("TEXTIFY_SKIP_DB_INIT", "1")
+    from app.main import app
+
+    with TestClient(app) as client:
+        private = client.post("/api/ask", json={"question": "Explain it?", "document_id": "0" * 36})
+        demo_short = client.post("/api/demo/ask", json={"question": "x"})
+    assert private.status_code == 401
+    # Not 401: the demo carve-out needs no code; a too-short question is a 422.
+    assert demo_short.status_code == 422
+
+
 def test_health_reports_architecture_release_and_security_headers(monkeypatch):
     monkeypatch.setenv("TEXTIFY_SKIP_DB_INIT", "1")
     from app.main import app

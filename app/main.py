@@ -27,7 +27,7 @@ from sqlalchemy import ForeignKey, String, Text, create_engine, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
-from .guard import require_access_code, require_paid_access, validate_access_code
+from .guard import require_access_code, require_paid_access, require_public_budget, validate_access_code
 from .rag import MAX_ANSWER_TOKENS, chunk_text, grounded_answer, legacy_source_fingerprint, source_fingerprint
 
 logger = logging.getLogger("uvicorn.error")
@@ -80,6 +80,48 @@ class StudyChunk(Base):
     document: Mapped[StudyDocument] = relationship(back_populates="chunks")
 
 
+# ---------------------------------------------------------------------------
+# Read-only public demo workspace.
+#
+# A single, seeded document that a reviewer can query WITHOUT an access code so
+# the cited-answer RAG flow can be watched end to end. It is a fixed-id record in
+# the same store as private sources; the public demo routes below only ever
+# reference DEMO_DOCUMENT_ID and never accept a caller-supplied document id, so
+# they can never read or write a private workspace. Seeding is idempotent and
+# only ever inserts this one document — it never touches or deletes private data.
+# The private access-code gate (UploadGateMiddleware + require_* on every real
+# route) is left exactly as it was.
+# ---------------------------------------------------------------------------
+DEMO_DOCUMENT_ID = "1a61dda9-6088-5cf1-a374-b9ef1201f1a2"
+DEMO_DOCUMENT_NAME = "RAG — a short primer.txt"
+DEMO_DOCUMENT_TEXT = (
+    "Retrieval-augmented generation, or RAG, is a technique that grounds a language model's answers in a "
+    "specific body of source material instead of relying only on what the model memorized during training. "
+    "A RAG system works in two main stages: retrieval and generation. In the retrieval stage, the user's "
+    "question is converted into a numerical vector called an embedding, and that vector is compared against "
+    "the embeddings of previously indexed document chunks. The chunks whose vectors are closest in meaning "
+    "are selected as evidence for the answer.\n\n"
+    "Before retrieval is possible, source documents must be indexed. Indexing splits each document into "
+    "overlapping passages, or chunks, and stores a vector embedding for every chunk in a vector database. "
+    "Textify uses pgvector, an extension for PostgreSQL, to store these embeddings and to rank them by "
+    "cosine distance so that the passages most relevant to a question surface first.\n\n"
+    "In the generation stage, the retrieved chunks are passed to the language model as trusted evidence, "
+    "together with the original question. The model is instructed to answer only from the supplied passages "
+    "and to cite each factual claim back to a numbered source such as S1 or S2. Because every sentence is "
+    "tied to a retrieved passage, a reader can verify the answer against the evidence rather than trusting "
+    "the model blindly.\n\n"
+    "Retrieval-augmented generation reduces hallucinations for two reasons. First, the model is constrained "
+    "to the provided passages, so it is far less likely to invent facts that were never in the sources. "
+    "Second, the visible citations make any unsupported claim easy to spot, because a claim with no matching "
+    "passage stands out immediately. This is why evidence-first designs pair retrieval with mandatory "
+    "citation: retrieval narrows what the model may say, and the citations let a human check every claim."
+)
+DEMO_QUESTIONS = [
+    "What are the two main stages of a RAG system?",
+    "Why does retrieval-augmented generation reduce hallucinations?",
+]
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     # Route tests must not need a live PostgreSQL instance. This is intentionally
@@ -92,6 +134,12 @@ async def lifespan(_: FastAPI):
             from .local_embeddings import warm_model
 
             warm_model()
+        # Best-effort at startup; the public demo routes also self-heal if this
+        # transiently fails, so a warming embedding backend never blocks boot.
+        try:
+            ensure_demo_seeded()
+        except Exception:
+            logger.exception("demo_seed_failed_at_startup")
     yield
 
 
@@ -270,9 +318,52 @@ def embed(texts: list[str], *, query: bool = False) -> list[list[float]]:
     return vectors
 
 
+def ensure_demo_seeded() -> bool:
+    """Idempotently seed the one public read-only demo document.
+
+    Returns True once the demo document exists. Only ever inserts the single
+    DEMO_DOCUMENT_ID record; it never updates or deletes any other row, so a
+    private workspace can never be touched by this path. Embedding provider work
+    is done outside any pooled database connection, matching the ingest route.
+    """
+    with SessionLocal() as session:
+        if session.get(StudyDocument, DEMO_DOCUMENT_ID) is not None:
+            return True
+
+    chunks = chunk_text(DEMO_DOCUMENT_TEXT)
+    if not chunks:
+        raise RuntimeError("Demo document produced no chunks.")
+    fingerprint = source_fingerprint(DEMO_DOCUMENT_TEXT)
+    vectors = embed([chunk.text for chunk in chunks])
+    with SessionLocal() as session:
+        if session.get(StudyDocument, DEMO_DOCUMENT_ID) is not None:
+            return True
+        doc = StudyDocument(id=DEMO_DOCUMENT_ID, name=DEMO_DOCUMENT_NAME, fingerprint=fingerprint)
+        session.add(doc)
+        session.add_all(
+            StudyChunk(
+                id=str(uuid.uuid4()), document=doc, position=chunk.position, content=chunk.text, embedding=vector
+            )
+            for chunk, vector in zip(chunks, vectors, strict=True)
+        )
+        try:
+            session.commit()
+        except IntegrityError:
+            # A concurrent worker seeded the same fixed id/fingerprint first.
+            session.rollback()
+            return session.get(StudyDocument, DEMO_DOCUMENT_ID) is not None
+    return True
+
+
 class AskRequest(BaseModel):
     question: str = Field(min_length=6, max_length=500)
     document_id: str = Field(min_length=36, max_length=36)
+
+
+class DemoAskRequest(BaseModel):
+    # A public caller may only supply a question; the document is always the
+    # seeded demo record, never a caller-chosen id.
+    question: str = Field(min_length=6, max_length=500)
 
 
 @app.get("/health")
@@ -455,6 +546,71 @@ def ask_question(request: Request, payload: AskRequest):
         )
     if not rows:
         raise HTTPException(404, "Document not found.")
+    citations = [{"source": f"S{i + 1}", "chunk": row.position + 1, "text": row.content} for i, row in enumerate(rows)]
+    try:
+        answer, mode = grounded_answer(payload.question, [row.content for row in rows])
+    except requests.Timeout as error:
+        raise HTTPException(504, "The answer provider timed out. Try again later.") from error
+    except requests.RequestException as error:
+        raise HTTPException(502, "The answer provider is unavailable or rejected this request.") from error
+    except (ValueError, KeyError, TypeError, IndexError, RuntimeError) as error:
+        raise HTTPException(502, "The answer provider returned an invalid response.") from error
+    return {"answer": answer, "generation_mode": mode, "citations": citations}
+
+
+@app.get("/api/demo")
+def demo_workspace():
+    """Public, read-only: describe the seeded demo document and its example questions.
+
+    No access code. Exposes only the single seeded demo record — never any
+    private source. Self-heals if startup seeding had not completed yet.
+    """
+    try:
+        seeded = ensure_demo_seeded()
+    except Exception as error:
+        raise HTTPException(503, "The read-only demo is warming up. Try again shortly.") from error
+    if not seeded:
+        raise HTTPException(503, "The read-only demo is warming up. Try again shortly.")
+    with SessionLocal() as session:
+        doc = session.get(StudyDocument, DEMO_DOCUMENT_ID)
+        if doc is None:
+            raise HTTPException(503, "The read-only demo is warming up. Try again shortly.")
+        return {
+            "id": doc.id,
+            "name": doc.name,
+            "chunks": len(doc.chunks),
+            "read_only": True,
+            "questions": DEMO_QUESTIONS,
+            "document": DEMO_DOCUMENT_TEXT,
+        }
+
+
+@app.post("/api/demo/ask")
+def demo_ask(request: Request, payload: DemoAskRequest):
+    """Public, read-only cited-answer flow against ONLY the seeded demo document.
+
+    Requires no access code, but stays budget-limited to protect the paid answer
+    provider. The retrieved document is forced to DEMO_DOCUMENT_ID here — a caller
+    can never point this route at a private source, and nothing is written.
+    """
+    require_public_budget(request, "demo-ask")
+    try:
+        seeded = ensure_demo_seeded()
+    except Exception as error:
+        raise HTTPException(503, "The read-only demo is warming up. Try again shortly.") from error
+    if not seeded:
+        raise HTTPException(503, "The read-only demo is warming up. Try again shortly.")
+    query = embed([payload.question], query=True)[0]
+    with SessionLocal() as session:
+        rows = (
+            session.query(StudyChunk)
+            .filter_by(document_id=DEMO_DOCUMENT_ID)
+            .order_by(StudyChunk.embedding.cosine_distance(query))
+            .limit(4)
+            .all()
+        )
+    if not rows:
+        raise HTTPException(503, "The read-only demo is warming up. Try again shortly.")
     citations = [{"source": f"S{i + 1}", "chunk": row.position + 1, "text": row.content} for i, row in enumerate(rows)]
     try:
         answer, mode = grounded_answer(payload.question, [row.content for row in rows])

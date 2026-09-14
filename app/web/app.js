@@ -31,6 +31,7 @@
   let pendingUploadContext = "sources";
   let onboardFile = null;
   let detailDocName = "";
+  let demoMode = false;
 
   /* ---------- element refs ---------- */
   const docs = $("#documents");
@@ -222,6 +223,9 @@
     }
     if (askErr) askErr.textContent = "";
     if (codeErr) codeErr.textContent = "";
+    demoMode = false;
+    $("#demoStarters").hidden = true;
+    lockChip.style.color = "";
     beginWorkspaceTransition();
     setCode(code);
     const askInput = $("#access-code");
@@ -233,7 +237,7 @@
     return true;
   }
   lockChip.addEventListener("click", () =>
-    isLocked() ? focusCodeField() : lockWorkspace(),
+    demoMode ? exitDemo() : isLocked() ? focusCodeField() : lockWorkspace(),
   );
   lockSwitch.addEventListener("click", () =>
     isLocked() ? focusCodeField() : lockWorkspace(),
@@ -248,6 +252,103 @@
     }
   });
   $("#sourcesUnlockCta").addEventListener("click", focusCodeField);
+
+  /* ---------- read-only public demo ---------- */
+  function renderDemoSource(data) {
+    latestDocuments = [
+      { id: data.id, name: data.name, chunks: data.chunks, demo: true },
+    ];
+    docs.replaceChildren(
+      new Option(`${data.name} · ${data.chunks} chunks`, data.id),
+    );
+    docs.value = data.id;
+
+    const list = $("#sourceList");
+    list.replaceChildren();
+    const row = document.createElement("div");
+    row.className = "source-row";
+    row.dataset.row = data.id;
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "source-item demo-source active";
+    item.dataset.source = data.id;
+    item.innerHTML =
+      '<span class="status-dot indexed"></span><span class="source-item-body"><span class="source-name"></span><span class="source-sub"></span></span>';
+    item.querySelector(".source-name").textContent = data.name;
+    item.querySelector(".source-sub").textContent =
+      `Read-only demo · ${data.chunks} chunks`;
+    row.append(item);
+    list.appendChild(row);
+
+    $("#sourcesCount").textContent = String(data.chunks);
+    $("#sourceList").hidden = false;
+    $("#sourcesEmptyState").hidden = true;
+    detailDocName = data.name;
+  }
+
+  function renderDemoStarters(questions) {
+    const holder = $("#demoStarterBtns");
+    holder.replaceChildren();
+    (questions || []).forEach((q) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "demo-starter-chip";
+      chip.textContent = q;
+      chip.addEventListener("click", () => {
+        if (askBtn.disabled) return;
+        composerInput.value = q;
+        $("#composerForm").requestSubmit();
+      });
+      holder.appendChild(chip);
+    });
+    $("#demoStarters").hidden = false;
+  }
+
+  async function enterDemo() {
+    const demoBtn = $("#tryDemoBtn");
+    if (demoBtn) demoBtn.disabled = true;
+    try {
+      const data = await readResponse(await fetch("/api/demo"));
+      demoMode = true;
+      beginWorkspaceTransition();
+      $("#askLockCard").hidden = true;
+      lockChipText.textContent = "Read-only demo";
+      lockChip.style.color = "var(--amber)";
+      renderDemoSource(data);
+      renderDemoStarters(data.questions);
+      // Fresh thread for the demo run.
+      thread.replaceChildren();
+      thread.appendChild(threadEmpty);
+      threadEmpty.hidden = false;
+      goTo("ask");
+      refreshAskAvailability();
+      toast("Read-only demo ready — ask or click an example question.");
+    } catch (error) {
+      toast(
+        error.message || "The demo is warming up. Try again shortly.",
+        "error",
+      );
+    } finally {
+      if (demoBtn) demoBtn.disabled = false;
+    }
+  }
+
+  function exitDemo() {
+    if (!demoMode) return;
+    demoMode = false;
+    beginWorkspaceTransition();
+    $("#demoStarters").hidden = true;
+    thread.replaceChildren();
+    thread.appendChild(threadEmpty);
+    threadEmpty.hidden = false;
+    askGrid.classList.remove("detail-open");
+    lockChip.style.color = "";
+    applyLockUI();
+    refresh();
+  }
+
+  $("#tryDemoBtn").addEventListener("click", enterDemo);
+  $("#demoExitBtn").addEventListener("click", exitDemo);
 
   /* ---------- source rendering (pane list + table + native select) ---------- */
   function iconForName(name) {
@@ -434,6 +535,19 @@
     refreshAskAvailability();
   }
   function refreshAskAvailability() {
+    if (demoMode) {
+      $("#composerForm").classList.remove("is-locked");
+      composerInput.disabled = false;
+      const out = remaining() <= 0;
+      askBtn.disabled = out;
+      $$("#demoStarterBtns .demo-starter-chip").forEach(
+        (c) => (c.disabled = out),
+      );
+      composerHint.textContent = out
+        ? "Question budget reached — resets within the hour."
+        : "Read-only demo · answers capped at 350 tokens";
+      return;
+    }
     if (isLocked()) {
       composerInput.disabled = true;
       askBtn.disabled = true;
@@ -583,7 +697,7 @@
 
   $("#composerForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (isLocked()) {
+    if (!demoMode && isLocked()) {
       toast("Unlock your workspace to ask a question.");
       return;
     }
@@ -632,10 +746,12 @@
 
     try {
       const data = await readResponse(
-        await fetch("/api/ask", {
+        await fetch(demoMode ? "/api/demo/ask" : "/api/ask", {
           method: "POST",
           headers: headers(true),
-          body: JSON.stringify({ document_id: selected, question: q }),
+          body: JSON.stringify(
+            demoMode ? { question: q } : { document_id: selected, question: q },
+          ),
           signal: controller.signal,
         }),
       );

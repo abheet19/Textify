@@ -85,6 +85,45 @@ def test_real_database_upload_dedupe_retrieve_delete(workspace, extension):
     assert len(w.calls) == count
 
 
+def test_public_demo_is_read_only_and_ungated_while_private_stays_locked(workspace):
+    w = workspace
+    # Private listing still demands the access code — the gate is untouched.
+    assert w.client.get("/api/documents").status_code == 401
+
+    # Seed the one demo record, then reach it with NO access code header.
+    assert w.main.ensure_demo_seeded() is True
+    described = w.client.get("/api/demo")
+    assert described.status_code == 200, described.text
+    body = described.json()
+    assert body["id"] == w.main.DEMO_DOCUMENT_ID
+    assert body["read_only"] is True
+    assert len(body["questions"]) == 2
+
+    # The demo shows up as exactly one indexed source and nothing else.
+    listed = w.client.get("/api/documents", headers=w.headers).json()
+    assert [doc["id"] for doc in listed] == [w.main.DEMO_DOCUMENT_ID]
+
+    # The cited-answer flow runs end to end without a code, for each example.
+    for question in body["questions"]:
+        answered = w.client.post("/api/demo/ask", json={"question": question})
+        assert answered.status_code == 200, answered.text
+        payload = answered.json()
+        assert payload["citations"], "demo answer must expose retrieved evidence"
+        assert "[S1]" in payload["answer"]
+
+    # The public demo route never accepts a caller-chosen document id and never
+    # writes: a private ask still requires the code, and deleting is still gated.
+    assert w.client.post("/api/demo/ask", json={"question": "x"}).status_code == 422
+    assert w.client.delete(f"/api/documents/{w.main.DEMO_DOCUMENT_ID}").status_code == 401
+    assert (
+        w.client.post(
+            "/api/ask",
+            json={"question": "What are the stages?", "document_id": w.main.DEMO_DOCUMENT_ID},
+        ).status_code
+        == 401
+    )
+
+
 @pytest.mark.parametrize(
     "filename,data,status",
     [
