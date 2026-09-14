@@ -194,7 +194,8 @@ async def observe_and_secure(request: Request, call_next):
     response.headers["Cache-Control"] = "no-store"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; "
-        "form-action 'self'; img-src 'self' data:; object-src 'none'"
+        "form-action 'self'; img-src 'self' data:; font-src 'self'; "
+        "object-src 'none'"
     )
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     response.headers["Referrer-Policy"] = "same-origin"
