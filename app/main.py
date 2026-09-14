@@ -381,6 +381,20 @@ def health():
     }
 
 
+@app.get("/version")
+def version():
+    """Expose the deployed revision and current public architecture contract."""
+    return {
+        "service": "textify",
+        "release_sha": RELEASE_SHA,
+        "framework": "FastAPI",
+        "retrieval": "RAG",
+        "storage": "PostgreSQL + pgvector",
+        "embedding_provider": EMBEDDING_PROVIDER,
+        "embedding_dimensions": EMBEDDING_DIMENSIONS,
+    }
+
+
 def valid_release_sha(value: str) -> bool:
     return bool(re.fullmatch(r"[0-9a-f]{40}", value))
 

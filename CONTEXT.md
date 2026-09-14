@@ -8,7 +8,7 @@ Textify is a private, single-user, citation-first RAG study workspace. A learner
 
 The shipped UI is the **redesign-glass** single-page app (`app/web/`), served at `/`: a rail + shell "glass" workspace with three numbered stages — **01 · Index** (Sources screen), **02 · Retrieve** (the default Ask screen), **03 · Answer** — plus a ⌘K/Ctrl-K command palette, an access-code lock card, and a source-excerpt detail panel that opens when a `[Sn]` citation is clicked. The retired `app/templates/` Jinja pages (`PDF.html`, `RAW_result.html`, …) are historical Flask artifacts and are NOT what `app.main:app` serves.
 
-Two embedding backends exist. The **local** path uses a pinned quantized `BAAI/bge-small-en-v1.5` ONNX model (384-d): no embedding API key, no hosted embedding call, and it is the default `fly.local-embeddings.toml` target. The **OpenAI** path uses `text-embedding-3-small` (1536-d). Note the currently-live `textify-abheet19` instance reports `embedding_provider: openai` / `1536` from `/health` — the deploy in front of users at time of writing runs the OpenAI path, while local-BGE is the zero-embedding-cost alternative. Claude or OpenAI answer generation is optional and can cost money; without a generation key, Textify returns retrieved evidence explicitly as `evidence-only`.
+Two embedding backends exist. The **local** path uses a pinned quantized `BAAI/bge-small-en-v1.5` ONNX model (384-d): no embedding API key, no hosted embedding call, and it is the default `fly.local-embeddings.toml` target. The **OpenAI** path uses `text-embedding-3-small` (1536-d). The currently-live `textify-abheet19` instance reports `embedding_provider: local` / `384` from `/health`; OpenAI remains an optional, separately stored alternative. Claude or OpenAI answer generation is optional and can cost money; without a generation key, Textify returns retrieved evidence explicitly as `evidence-only`.
 
 ## User states and CTAs
 
@@ -48,7 +48,7 @@ Provider and CPU inference must never hold a database connection. Local and Open
 
 | Path | Responsibility |
 | --- | --- |
-| `app/main.py` | ASGI upload gate, FastAPI lifespan/middleware/routes, parsers/bounds, ORM, provider selection, health/readiness |
+| `app/main.py` | ASGI upload gate, FastAPI lifespan/middleware/routes, parsers/bounds, ORM, provider selection, version/health/readiness |
 | `app/guard.py` | constant-time shared-code validation and rolling upload/question budgets |
 | `app/rag.py` | normalization, chunking, compatible fingerprints, prompt isolation, answer-provider schema validation |
 | `app/local_embeddings.py` | pinned offline BGE load, query/passage encoding, shape checks, serialized inference |
@@ -96,7 +96,7 @@ Production images set `TEXTIFY_REQUIRE_ACCESS_CODE=1`. Upload authentication run
 
 Install Python and Node dependencies, run `npm run precommit`, then run pytest with a disposable PostgreSQL 17 + pgvector database and `TEXTIFY_RUN_BROWSER_TESTS=1`. CI independently repeats lint, format, dependency audits, full host/browser tests, exact image builds, non-root/read-only assertions, real local BGE inference, and a container upload → ask → delete flow using synthetic data and no hosted provider.
 
-Fly deployment is manual and defaults to `fly.local-embeddings.toml`. A release is complete only when the source SHA, successful CI SHA, image revision, Fly release, `/health.release`, and `/ready.release` agree. Preserve the previous verified image/config for rollback. Never use production data for tests or print the private access code.
+Fly deployment is manual and defaults to `fly.local-embeddings.toml`. A release is complete only when the source SHA, successful CI SHA, image revision, Fly release, `/version.release_sha`, `/health.release`, and `/ready.release` agree. Preserve the previous verified image/config for rollback. Never use production data for tests or print the private access code.
 
 ## Accessibility and performance boundary
 

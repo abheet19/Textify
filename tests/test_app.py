@@ -100,6 +100,26 @@ def test_health_reports_architecture_release_and_security_headers(monkeypatch):
     assert "Access-Control-Allow-Origin" not in response.headers
 
 
+def test_version_reports_release_and_current_stack(monkeypatch):
+    monkeypatch.setenv("TEXTIFY_SKIP_DB_INIT", "1")
+    import app.main as main
+
+    monkeypatch.setattr(main, "RELEASE_SHA", "a" * 40)
+    with TestClient(main.app) as client:
+        response = client.get("/version")
+    assert response.status_code == 200
+    assert response.json() == {
+        "service": "textify",
+        "release_sha": "a" * 40,
+        "framework": "FastAPI",
+        "retrieval": "RAG",
+        "storage": "PostgreSQL + pgvector",
+        "embedding_provider": main.EMBEDDING_PROVIDER,
+        "embedding_dimensions": main.EMBEDDING_DIMENSIONS,
+    }
+    assert response.headers["Cache-Control"] == "no-store"
+
+
 def test_home_uses_external_assets_only(monkeypatch):
     monkeypatch.setenv("TEXTIFY_SKIP_DB_INIT", "1")
     from app.main import app

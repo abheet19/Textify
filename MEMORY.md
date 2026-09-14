@@ -38,7 +38,7 @@ Theme, unlock, wrong-code handling, lock, upload, duplicate upload, source selec
 1. Run the full GitHub `Verify Textify` workflow for the exact pushed SHA; it supplies disposable pgvector and real Chromium.
 2. Require every job green and retain the browser artifact.
 3. Deploy that exact SHA with `fly.local-embeddings.toml`.
-4. Verify public `/health` and `/ready` return 200 and the exact SHA, local provider, and 384 dimensions.
+4. Verify public `/version`, `/health`, and `/ready` return 200 and the exact SHA, local provider, and 384 dimensions.
 5. Do not make a paid live generation call for verification. CI proves upload/retrieval/evidence-only/delete with a real local model. If a live write smoke is later authorized, use synthetic data and guarantee cleanup without exposing the code.
 6. Record CI URL, Fly release/image identity, endpoint output, UTC time, and limitations in the external verification artifact and Study Pack.
 
