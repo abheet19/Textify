@@ -302,7 +302,7 @@ def embed(texts: list[str], *, query: bool = False) -> list[list[float]]:
             if any(
                 len(vector) != 1536
                 or any(
-                    isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
+                    isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value)
                     for value in vector
                 )
                 for vector in batch_vectors

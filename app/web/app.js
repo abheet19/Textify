@@ -616,11 +616,13 @@
           document.createTextNode(text.slice(last, m.index)),
         );
       const key = "S" + m[1];
-      const chip = document.createElement("span");
+      const chip = document.createElement("button");
+      chip.type = "button";
       chip.className = "cite";
       chip.dataset.cite = key;
       chip.textContent = m[1];
       if (citeMap[key]) {
+        chip.setAttribute("aria-label", `Open source ${key} excerpt`);
         chip.addEventListener("click", () => openDetail(key, chip));
         used.add(key);
       }
@@ -665,10 +667,12 @@
       label.textContent = "Evidence:";
       ev.appendChild(label);
       for (const c of citations) {
-        const chip = document.createElement("span");
+        const chip = document.createElement("button");
+        chip.type = "button";
         chip.className = "cite";
         chip.dataset.cite = c.source;
         chip.textContent = c.source.replace(/^S/, "");
+        chip.setAttribute("aria-label", `Open source ${c.source} excerpt`);
         chip.addEventListener("click", () => openDetail(c.source, chip));
         ev.appendChild(chip);
       }
