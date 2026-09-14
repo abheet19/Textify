@@ -2131,6 +2131,10 @@ tbody tr:hover {
     flex: 0 0 auto;
     white-space: nowrap;
   }
+  .toast {
+    bottom: 76px;
+    max-width: calc(100% - 24px);
+  }
   .topbar {
     flex-wrap: wrap;
     row-gap: 8px;
@@ -2166,5 +2170,12 @@ tbody tr:hover {
   }
   .topbar-right {
     gap: 6px;
+  }
+  .composer-row {
+    flex-wrap: wrap;
+  }
+  .composer-row .btn {
+    white-space: nowrap;
+    margin-left: auto;
   }
 }
