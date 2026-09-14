@@ -28,13 +28,13 @@
         <div class="tab-panel active" data-panel="summary">
             <div class="glass-card summary-card">
                 <div class="summary-card-header">
-                    <h4><i class="fa fa-file-text-o"></i> Extractive Summary</h4>
-                    <span class="summary-badge">TextRank</span>
+                    <h4><i class="fa fa-file-text-o"></i> Summary</h4>
+                    <span class="summary-badge">Key sentences</span>
                 </div>
                 <div class="summary-content" id="summary">{{ summary }}</div>
                 <div class="summary-card-footer">
                     <i class="fa fa-info-circle"></i>
-                    The most information-dense sentences from your document, picked by TextRank — no rewriting, no ML model.
+                    These are the key sentences pulled straight from your document — nothing is rewritten or AI-generated.
                 </div>
             </div>
         </div>
@@ -72,7 +72,7 @@
                     {% endfor %}
                 </div>
                 {% else %}
-                <div class="empty-state"><i class="fa fa-question-circle-o"></i> Not enough structured content to generate quiz questions.</div>
+                <div class="empty-state"><i class="fa fa-question-circle-o"></i> There wasn't enough clear question-and-answer material here to build a quiz.</div>
                 {% endif %}
             </div>
         </div>
