@@ -171,3 +171,188 @@ The static UI has no framework runtime, and requests are bounded. Historical Lig
 4. Do not convert automated axe/Lighthouse checks into a WCAG certification claim.
 5. Measure retrieval quality or capacity before claiming accuracy, scale, or latency percentiles.
 6. Update `MEMORY.md`, tests, usage docs, and exact release evidence when behavior or release state changes.
+
+## Annotated core code + knowledge graph
+
+This section grounds "explain this code" questions in the real source on branch `redesign-glass`. Every name below is a real symbol; nothing is invented. Read it beside the `Active code map` above — that table lists responsibilities; this one shows the actual control/data flow and the three excerpts an interviewer is most likely to point at.
+
+### Knowledge graph / structure map
+
+The runnable product is one FastAPI app (`app.main:app`). Two flows matter: **ingest** (upload → gate → extract → chunk → embed → pgvector) and **ask** (question → embed query → pgvector cosine top-4 → grounded, cited answer). The upload gate is a raw ASGI middleware that runs *outside and before* the FastAPI router; everything else is ordinary route code.
+
+```mermaid
+flowchart TD
+    B([Browser SPA<br/>app/web]):::ui
+
+    subgraph GATE["Pre-body ASGI gate · app/main.py"]
+        UG["UploadGateMiddleware.__call__<br/>only POST /api/documents"]:::gate
+        VA["validate_access_code<br/>app/guard.py · hmac.compare_digest"]:::guard
+        CL["Content-Length cap + streamed<br/>chunk counter → 413"]:::gate
+    end
+
+    subgraph ROUTES["FastAPI routes · app/main.py"]
+        ING["ingest_document<br/>POST /api/documents"]:::main
+        ASK["ask_question<br/>POST /api/ask"]:::main
+        EMB["embed() — provider switch"]:::main
+        EX["extract() — PDF/DOCX/TXT, bounded"]:::main
+    end
+
+    subgraph RAGMOD["Retrieval + synthesis · app/rag.py"]
+        CH["chunk_text<br/>180-word window / 36-word overlap"]:::rag
+        GA["grounded_answer<br/>untrusted-source prompt, cite [Sn]"]:::rag
+        FP["source_fingerprint<br/>normalized SHA-256 dedupe"]:::rag
+    end
+
+    LE["local_embed — BGE-small 384d<br/>app/local_embeddings.py"]:::embed
+    OA["OpenAI text-embedding-3-small · 1536d"]:::embed
+    PG[("pgvector<br/>*_documents / *_chunks.embedding")]:::store
+
+    B -->|multipart upload| UG
+    UG --> VA --> CL --> ING
+    ING --> EX --> CH --> FP
+    CH --> EMB
+    EMB --> LE & OA --> PG
+    B -->|question| ASK
+    ASK -->|query=True| EMB
+    ASK -->|"cosine_distance ORDER BY, LIMIT 4"| PG
+    PG -->|4 passages| GA --> ASK
+    ASK -->|"answer + Sn citations"| B
+
+    classDef ui fill:#e6f0ff,stroke:#3b6db3,color:#12243b;
+    classDef gate fill:#fde2e1,stroke:#c0392b,color:#4a1512;
+    classDef guard fill:#ffe9c7,stroke:#c77d1a,color:#4a3210;
+    classDef main fill:#dbeafe,stroke:#2563eb,color:#0f2a52;
+    classDef rag fill:#d9f2e3,stroke:#16a34a,color:#0d3320;
+    classDef embed fill:#ece0fb,stroke:#8b5cf6,color:#2c1a52;
+    classDef store fill:#fef3c7,stroke:#d97706,color:#3a2708;
+```
+
+**One line per file that matters:**
+
+- `app/main.py` — the whole runnable app: the `UploadGateMiddleware` fail-closed gate, `extract()` parsing with bounds, `embed()` provider switch, the two ORM models (`StudyDocument`/`StudyChunk`, table names chosen by provider), and the `ingest_document` / `ask_question` / `delete_document` routes.
+- `app/rag.py` — pure, DB-free RAG logic: `chunk_text` (sentence-aware overlapping windows), `prompt`/`grounded_answer` (untrusted-source isolation + provider schema checks), and the dedupe fingerprints.
+- `app/local_embeddings.py` — the offline BGE path: `local_embed` produces real 384-d vectors on CPU with a serialized-inference lock and a strict shape check; no hosted call, no runtime model download.
+- `app/guard.py` — `validate_access_code` (constant-time `hmac.compare_digest`, fail-closed in production) and `RequestBudget` (deque-based rolling per-client rate limit). Called by both the gate and the routes.
+- `app/web/{index.html,app.js,app.css}` — the shipped glass SPA (state machine, request cancellation/versioning, `textContent`-only rendering). Not shown in the excerpts below because the questions here are backend/RAG questions.
+
+### Excerpt 1 — the fail-closed upload gate (`app/main.py`, `UploadGateMiddleware.__call__`)
+
+This is a raw ASGI middleware wrapped *outside* FastAPI, so it runs before the multipart parser spools the body. It authenticates and size-caps first, and it fails closed.
+
+```python
+async def __call__(self, scope, receive, send) -> None:
+    # Gate ONLY the upload route; every other request is passed straight through untouched.
+    if scope["type"] != "http" or scope["method"] != "POST" or scope["path"] != "/api/documents":
+        await self.application(scope, receive, send)
+        return
+
+    headers = {name.lower(): value for name, value in scope.get("headers", [])}
+    # (1) AUTHENTICATE before a single body byte is read — same constant-time guard the routes use.
+    try:
+        validate_access_code(headers.get(b"x-textify-access-code", b"").decode("utf-8", errors="ignore"))
+    except HTTPException as error:                       # bad/missing code -> reject now, nothing spooled
+        await JSONResponse({"detail": error.detail}, status_code=error.status_code, headers=error.headers)(
+            scope, receive, send
+        )
+        return
+
+    content_length = headers.get(b"content-length")
+    if content_length:
+        try:
+            # (2) Reject on the ADVERTISED size before buffering anything.
+            if int(content_length) > self.max_body_bytes:
+                await JSONResponse(
+                    {"detail": "Upload request exceeds the safe processing limit."}, status_code=413
+                )(scope, receive, send)
+                return
+        except ValueError:                              # non-numeric header is itself suspect -> 400
+            await JSONResponse({"detail": "Invalid Content-Length header."}, status_code=400)(scope, receive, send)
+            return
+
+    consumed = 0
+    exceeded = False
+
+    async def limited_receive():                        # wraps the ASGI receive() the parser will call
+        nonlocal consumed, exceeded
+        message = await receive()
+        if message["type"] == "http.request":
+            consumed += len(message.get("body", b""))
+            # (3) Enforce the REAL cap on streamed bytes — a lying or absent Content-Length
+            #     cannot slip past this running counter.
+            if consumed > self.max_body_bytes:
+                exceeded = True
+                raise UploadBodyTooLarge                 # abort mid-stream; parser never finishes buffering
+        return message
+
+    async def limited_send(message):
+        if not exceeded:                                # suppress the app's partial response once we've bailed
+            await send(message)
+
+    try:
+        await self.application(scope, limited_receive, limited_send)
+    except UploadBodyTooLarge:
+        pass
+    if exceeded:                                        # fail CLOSED: return our own 413, not whatever leaked
+        logger.warning("upload_body_limit_exceeded path=/api/documents")
+        await JSONResponse({"detail": "Upload request exceeds the safe processing limit."}, status_code=413)(
+            scope, receive, send
+        )
+```
+
+- **What an interviewer might ask — "Why not just check the size inside the route / with a FastAPI dependency?"** Because by the time route code (or a route-level `Depends`) runs, Starlette's multipart parser has already consumed and spooled the body (large parts go to a temp file on disk). The one security-critical ordering requirement — authenticate and size-limit *before* parsing — is only enforceable at the outermost ASGI layer. The `limited_receive` wrapper is the trick: it intercepts each `receive()` the parser makes and raises `UploadBodyTooLarge` the instant the running total crosses the cap, so an attacker sending a huge or chunked body (no honest `Content-Length`) is cut off mid-stream rather than after buffering 3 MB+. "Fail closed" = if anything is wrong, we emit our own `413`/`401` and drop the app's partial output (`limited_send` gate), never leaking a half-formed response.
+
+### Excerpt 2 — local BGE embeddings, serialized and shape-checked (`app/local_embeddings.py`, `local_embed`)
+
+The zero-cost, fully-offline embedding path. Real vectors, CPU, pinned model — no hosted API, no runtime download.
+
+```python
+def local_embed(texts: list[str], *, query: bool = False) -> list[list[float]]:
+    # Single ONNX session, threads=1: reject concurrent work instead of oversubscribing CPU.
+    if not _inference.acquire(blocking=False):
+        raise HTTPException(429, "Indexing is busy. Try again shortly.", headers={"Retry-After": "5"})
+    try:
+        model = warm_model()
+        # Asymmetric encoding: BGE has distinct query vs passage instructions -> pick by `query`.
+        iterator = model.query_embed(texts, batch_size=1) if query else model.passage_embed(texts, batch_size=1)
+        vectors = [[float(value) for value in vector] for vector in iterator]
+        # Never trust the tensor blindly: exact count, exact 384-d, all-finite (no NaN/inf) or bail.
+        if len(vectors) != len(texts) or any(
+            len(vector) != DIMENSIONS or not all(math.isfinite(value) for value in vector) for vector in vectors
+        ):
+            raise RuntimeError("Local embeddings failed their shape check.")
+        return vectors
+    except HTTPException:
+        raise
+    except Exception as error:
+        # Fail closed: any inference failure -> 503 and the caller stores NOTHING.
+        raise HTTPException(503, "Local semantic indexing is unavailable. No document data was stored.") from error
+    finally:
+        _inference.release()
+```
+
+- **What an interviewer might ask — "Why the lock and the `query` flag?"** The model is one `fastembed.TextEmbedding` ONNX session pinned to `threads=1` and cached with `@lru_cache(maxsize=1)`; `_inference` is a non-blocking `Lock`, so a second concurrent request gets a clean `429 Retry-After` instead of thrashing a single CPU core (the app is a small single-user workspace, so serializing is the honest trade-off, not a bottleneck to hide). The `query` flag exists because BGE is an *asymmetric* retrieval model — passages and queries are embedded with different instruction prefixes (`passage_embed` vs `query_embed`), and mixing them degrades cosine relevance. **Complexity/trade-off:** throughput is capped at one inference at a time by design; the shape check is O(n·d) over the returned vectors, cheap next to inference, and it guarantees a malformed tensor becomes a bounded `503` with zero rows written rather than a corrupt embedding in pgvector.
+
+### Excerpt 3 — pgvector cosine retrieval → cited answer (`app/main.py`, `ask_question`)
+
+The retrieval crux: embed the question, order the selected document's chunks by cosine distance in Postgres, keep the top 4, and hand them to the grounded answerer with stable `[Sn]` citation labels.
+
+```python
+require_paid_access(request, "ask")
+query = embed([payload.question], query=True)[0]          # 1 query vector; query=True -> BGE query encoding
+with SessionLocal() as session:
+    rows = (
+        session.query(StudyChunk)
+        .filter_by(document_id=payload.document_id)       # search is scoped to ONE selected document
+        .order_by(StudyChunk.embedding.cosine_distance(query))  # pgvector <=> operator, ascending distance
+        .limit(4)                                         # top-4 nearest passages
+        .all()
+    )                                                     # session closes here — no DB held during generation
+if not rows:
+    raise HTTPException(404, "Document not found.")
+# Stable citation contract: S1..S4 map to real stored chunk positions the UI can open.
+citations = [{"source": f"S{i + 1}", "chunk": row.position + 1, "text": row.content} for i, row in enumerate(rows)]
+answer, mode = grounded_answer(payload.question, [row.content for row in rows])
+return {"answer": answer, "generation_mode": mode, "citations": citations}
+```
+
+- **What an interviewer might ask — "Why pgvector cosine over an exact scan, and what's the complexity?"** `cosine_distance` compiles to pgvector's `<=>` operator; here it runs as an **exact** ordered scan over only the chunks of one document (`filter_by(document_id=...)`), because the corpus is small and per-document (≤120 chunks). That's O(n·d) distance work + an O(n log k) top-k, which is faster and simpler than maintaining an approximate (HNSW/IVFFlat) index that only earns its cost at large or cross-corpus scale. Note the DB session is opened only for the query and **closed before `grounded_answer`** — provider/LLM latency is seconds, and holding a pooled connection across it would starve the pool. The `citations` list is the product's whole point: `S1..S4` are returned to the browser so a human can verify each factual claim against the exact `row.position`/`row.content` that was retrieved, and `grounded_answer` is instructed to cite them as `[Sn]` — retrieval stays auditable rather than a black box.
