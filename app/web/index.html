@@ -135,11 +135,11 @@
               aria-label="Workspace lock state"
             >
               <svg
+                class="chip-icon"
                 viewBox="0 0 24 24"
                 width="12"
                 height="12"
                 aria-hidden="true"
-                style="stroke: currentColor; fill: none; stroke-width: 2"
               >
                 <rect x="4" y="10" width="16" height="10" rx="2" />
                 <path d="M8 10V7a4 4 0 0 1 8 0v3" />
@@ -164,12 +164,7 @@
               >
                 <div class="pane-label">
                   Indexed sources
-                  <span
-                    class="mono"
-                    id="sourcesCount"
-                    style="color: var(--text-faint); font-weight: 400"
-                    >0</span
-                  >
+                  <span class="mono pane-count" id="sourcesCount">0</span>
                 </div>
 
                 <div class="lock-card glass" id="askLockCard" hidden>
@@ -353,10 +348,9 @@
                   >
                 </div>
                 <button
-                  class="btn small"
+                  class="btn small detail-open-source"
                   id="detailOpenSource"
                   type="button"
-                  style="align-self: flex-start"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path
@@ -524,10 +518,9 @@
                   />
                 </div>
                 <div
-                  class="field-error"
+                  class="field-error onboard-error"
                   id="codeFieldError"
                   role="status"
-                  style="margin-top: 6px"
                 ></div>
                 <p class="field-note">
                   This single code both creates and unlocks the workspace —
@@ -656,9 +649,8 @@
                           Resets on the hour · counted for this browser session
                         </div>
                       </div>
-                      <div style="display: flex; align-items: center; gap: 8px">
-                        <span class="usage-bar"
-                          ><i id="usageBar" style="width: 0%"></i></span
+                      <div class="usage-row">
+                        <span class="usage-bar"><i id="usageBar"></i></span
                         ><span class="mono" id="usageText">0 / 12</span>
                       </div>
                     </div>
@@ -678,9 +670,9 @@
                           Resets on the hour, per client
                         </div>
                       </div>
-                      <div style="display: flex; align-items: center; gap: 8px">
+                      <div class="usage-row">
                         <span class="usage-bar"
-                          ><i id="uploadUsageBar" style="width: 0%"></i></span
+                          ><i id="uploadUsageBar"></i></span
                         ><span class="mono" id="uploadUsageText">0 / 3</span>
                       </div>
                     </div>
@@ -713,7 +705,7 @@
                           user-configurable
                         </div>
                       </div>
-                      <div class="range-row" style="width: 200px">
+                      <div class="range-row">
                         <input
                           type="range"
                           min="0"
@@ -795,7 +787,7 @@
                     data-pane="danger"
                     hidden
                   >
-                    <h3 style="color: var(--bad)">Danger zone</h3>
+                    <h3>Danger zone</h3>
                     <p class="sub">
                       Clearing the index deletes every source and its embeddings
                       from this workspace. This cannot be undone.

@@ -591,6 +591,12 @@ a {
 .chip-dot.bad {
   background: var(--bad);
 }
+.chip-icon {
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  flex: 0 0 auto;
+}
 .chip.lock {
   cursor: pointer;
   transition:
@@ -654,6 +660,11 @@ a {
 .ask-grid.detail-open {
   grid-template-columns: 248px minmax(0, 1fr) 328px;
 }
+/* The collapsed 0px column still holds focusable controls; keep them out of
+   the tab order (and off-screen paint) until an excerpt is open. */
+.ask-grid:not(.detail-open) .detail-panel {
+  visibility: hidden;
+}
 
 .sources-pane {
   border-right: 1px solid var(--border);
@@ -662,6 +673,10 @@ a {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+.pane-count {
+  color: var(--text-faint);
+  font-weight: 400;
 }
 .pane-label {
   font-size: 10.5px;
@@ -854,6 +869,9 @@ a {
 }
 .answer-card p + p {
   margin-top: 10px;
+}
+.answer-card p.thinking {
+  color: var(--text-faint);
 }
 .cite {
   display: inline-flex;
@@ -1061,6 +1079,9 @@ a {
 }
 .detail-close {
   margin-left: auto;
+}
+.detail-open-source {
+  align-self: flex-start;
 }
 
 /* ============================= SOURCES SCREEN ============================= */
@@ -1475,6 +1496,11 @@ tbody tr:hover {
   color: var(--text-faint);
   margin-top: 2px;
 }
+.usage-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .usage-bar {
   width: 140px;
   height: 6px;
@@ -1542,6 +1568,7 @@ tbody tr:hover {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 200px;
 }
 .range-row input[type="range"] {
   flex: 1 1 auto;
@@ -1556,6 +1583,9 @@ tbody tr:hover {
 }
 .danger-card {
   border-color: var(--bad-soft);
+}
+.danger-card h3 {
+  color: var(--bad);
 }
 
 /* ============================= COMMAND PALETTE ============================= */
@@ -1802,6 +1832,9 @@ tbody tr:hover {
 .field-error {
   color: var(--bad);
   font-size: 11px;
+}
+.onboard-error {
+  margin-top: 6px;
 }
 
 /* --- read-only demo carve-out --- */
@@ -2093,6 +2126,10 @@ tbody tr:hover {
     flex-direction: row;
     overflow-x: auto;
     position: static;
+  }
+  .settings-nav button {
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
   .topbar {
     flex-wrap: wrap;

@@ -180,6 +180,8 @@
   );
 
   function focusCodeField() {
+    // The lock card is hidden while the demo runs; leave it so the field exists.
+    if (demoMode) exitDemo();
     goTo("ask");
     setTimeout(() => $("#access-code")?.focus(), 60);
   }
@@ -505,8 +507,13 @@
       docs.replaceChildren(new Option("Access code required", ""));
       $("#sourceList").replaceChildren();
       $("#sourcesTbody").replaceChildren();
+      // A rejected code must never leave the shell looking unlocked-but-empty:
+      // drop it, restore the lock card, and surface the server's reason there.
+      if (error.status === 401 || error.status === 503) setCode("");
       updateDerived();
+      applyLockUI();
       if ($("#askLockError")) $("#askLockError").textContent = error.message;
+      if (isLocked()) toast(error.message, "error");
     }
   }
 
@@ -729,7 +736,7 @@
     const thinking = document.createElement("div");
     thinking.className = "msg-answer";
     thinking.innerHTML =
-      '<div class="answer-card glass"><p style="color:var(--text-faint);">Retrieving supported evidence…</p></div>';
+      '<div class="answer-card glass"><p class="thinking">Retrieving supported evidence…</p></div>';
     thread.appendChild(thinking);
     thread.scrollTop = thread.scrollHeight;
 
@@ -1168,6 +1175,10 @@
         tag: "Ask",
         icon: "M21 11.5a8.5 8.5 0 0 1-8.5 8.5 8.4 8.4 0 0 1-4-1L3 20l1.1-5.3A8.5 8.5 0 1 1 21 11.5Z",
         run: () => {
+          if (composerInput.disabled && isLocked()) {
+            focusCodeField();
+            return;
+          }
           goTo("ask");
           composerInput.focus();
         },
