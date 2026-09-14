@@ -187,7 +187,7 @@ Without `TEXTIFY_TEST_DATABASE_URL`, the PostgreSQL/pgvector and browser cases d
 
 ## Live deployment
 
-The Fly app is **`textify-abheet19`** (one shared CPU, 512 MiB, auto stop/start). `/health` reports the deployed Git SHA, storage, retrieval mode, and the active embedding provider; `/ready` additionally checks release identity, DB connectivity, and model availability. The instance currently live runs the **OpenAI 1536-d embedding path**; the local-BGE image is the zero-embedding-cost alternative and the default `fly.local-embeddings.toml` target. There is also a static, honest `/mcp/manifest.json` describing the REST tools (`list_sources`, `add_source`, `ask_question`, `remove_source`) so an agent in the wider ecosystem can discover what Textify does.
+The Fly app is **`textify-abheet19`** (one shared CPU, 512 MiB, auto stop/start). `/health` reports the deployed Git SHA, storage, retrieval mode, and the active embedding provider; `/ready` additionally checks release identity, DB connectivity, and model availability. The instance currently live reports the pinned local **BGE 384-d embedding path**, so document embeddings do not leave the service; OpenAI's 1536-d path remains an optional, separately stored alternative. There is also a static, honest `/mcp/manifest.json` describing the REST tools (`list_sources`, `add_source`, `ask_question`, `remove_source`) so an agent in the wider ecosystem can discover what Textify does.
 
 ```powershell
 fly deploy --build-only --remote-only --config fly.local-embeddings.toml
