@@ -168,9 +168,6 @@ try {
     "TXT upload selects indexed source and renders filename as text",
     async () => {
       await page.locator("#file").setInputFiles(file);
-      await page
-        .getByRole("button", { name: "Build evidence index", exact: true })
-        .click();
       await page.waitForFunction(() =>
         document
           .querySelector("#upload-status")
@@ -187,9 +184,7 @@ try {
   await check(
     "duplicate upload retains one document and gives explicit feedback",
     async () => {
-      await page
-        .getByRole("button", { name: "Build evidence index", exact: true })
-        .click();
+      await page.locator("#file").setInputFiles(file);
       await page.waitForFunction(() =>
         document
           .querySelector("#upload-status")
@@ -308,29 +303,18 @@ try {
         mimeType: "text/html",
         buffer: Buffer.from("<h1>bad</h1>"),
       });
-      await page
-        .getByRole("button", { name: "Build evidence index", exact: true })
-        .click();
       await page.waitForFunction(() =>
         document
           .querySelector("#upload-status")
           .textContent.includes("supports PDF"),
       );
       await page.locator("#file").setInputFiles(file);
-      await page
-        .getByRole("button", { name: "Build evidence index", exact: true })
-        .click();
       await page.waitForFunction(() =>
         document
           .querySelector("#upload-status")
           .textContent.includes("Request budget reached"),
       );
-      assert.equal(
-        await page
-          .getByRole("button", { name: "Build evidence index", exact: true })
-          .isEnabled(),
-        true,
-      );
+      assert.equal(await page.locator("#dropzone").isVisible(), true);
     },
   );
   await check(
