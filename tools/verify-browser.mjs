@@ -396,6 +396,47 @@ try {
     path: path.join(out, "textify-mobile-locked.png"),
     fullPage: true,
   });
+  await check(
+    "read-only demo exposes one consistent source and readable citations",
+    async () => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page
+        .getByRole("button", {
+          name: "Try the read-only demo — no code needed",
+          exact: true,
+        })
+        .click();
+      await page.locator("#demoStarters").waitFor();
+      const selectedSource = await page.locator("#documents option").first();
+      const sourceName = (await selectedSource.innerText()).split(" · ")[0];
+
+      await page.getByRole("button", { name: "Sources", exact: true }).click();
+      assert.equal(await page.locator("#sourcesLockedNotice").isHidden(), true);
+      assert.equal(await page.locator("#tableEmptyState").isHidden(), true);
+      assert.equal(await page.locator("#sourcesTbody tr").count(), 1);
+      assert.equal(
+        await page.locator("#sourcesTbody .file-name").innerText(),
+        sourceName,
+      );
+      assert.equal(await page.locator("#sourcesCount").innerText(), "1");
+      assert.equal(
+        await page.locator("#sourcesTbody [data-remove-row]").count(),
+        0,
+      );
+
+      await page.getByRole("button", { name: "Ask", exact: true }).click();
+      await page.locator("#demoStarterBtns button").first().click();
+      await page.waitForFunction(() =>
+        document.querySelector("#thread .msg-answer .cite"),
+      );
+      const citation = page.locator("#thread .msg-answer .cite").first();
+      assert.match(await citation.innerText(), /^\[S\d+\]$/);
+      assert.match(
+        (await citation.getAttribute("aria-label")) || "",
+        /^Open source S\d+ excerpt$/,
+      );
+    },
+  );
   const expectedConsoleStatusPattern =
     /Failed to load resource: the server responded with a status of (401|415|429)\b/;
   const expectedConsoleErrors = consoleErrors.filter((message) =>

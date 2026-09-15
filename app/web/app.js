@@ -317,9 +317,33 @@
     row.append(item);
     list.appendChild(row);
 
-    $("#sourcesCount").textContent = String(data.chunks);
+    // Keep the read-only sample consistent across both product surfaces. The
+    // Ask pane and Sources table describe the same seeded document; demo mode
+    // never adds a remove action or enables uploads.
+    const tbody = $("#sourcesTbody");
+    tbody.replaceChildren();
+    const tableRow = document.createElement("tr");
+    tableRow.dataset.row = data.id;
+    tableRow.innerHTML =
+      '<td><div class="file-cell"><span class="file-icon"><svg viewBox="0 0 24 24" aria-hidden="true">' +
+      iconForName(data.name) +
+      '</svg></span><div><div class="file-name"></div><div class="source-sub">Read-only demo</div></div></div></td>' +
+      '<td><span class="status-pill indexed">● Indexed</span></td>' +
+      '<td class="mono"></td>' +
+      '<td class="mono">Sample</td>' +
+      '<td><span class="answer-meta">View only</span></td>';
+    tableRow.querySelector(".file-name").textContent = data.name;
+    tableRow.querySelector("td:nth-child(3)").textContent = String(data.chunks);
+    tbody.appendChild(tableRow);
+
+    $("#sourcesCount").textContent = "1";
     $("#sourceList").hidden = false;
     $("#sourcesEmptyState").hidden = true;
+    $("#sourcesLockedNotice").hidden = true;
+    $("#sourcesTableWrap").classList.remove("disabled");
+    const tableScroll = $("#sourcesTableWrap .table-scroll");
+    if (tableScroll) tableScroll.hidden = false;
+    $("#tableEmptyState").hidden = true;
     detailDocName = data.name;
   }
 
@@ -656,7 +680,7 @@
       chip.type = "button";
       chip.className = "cite";
       chip.dataset.cite = key;
-      chip.textContent = m[1];
+      chip.textContent = `[${key}]`;
       if (citeMap[key]) {
         chip.setAttribute("aria-label", `Open source ${key} excerpt`);
         chip.addEventListener("click", () => openDetail(key, chip));
@@ -707,7 +731,7 @@
         chip.type = "button";
         chip.className = "cite";
         chip.dataset.cite = c.source;
-        chip.textContent = c.source.replace(/^S/, "");
+        chip.textContent = `[${c.source}]`;
         chip.setAttribute("aria-label", `Open source ${c.source} excerpt`);
         chip.addEventListener("click", () => openDetail(c.source, chip));
         ev.appendChild(chip);
