@@ -350,7 +350,7 @@ try {
       "light",
     );
     assert.equal(await theme.getAttribute("aria-pressed"), "true");
-    assert.equal(await theme.innerText(), "Light theme");
+    assert.equal(await theme.innerText(), "Switch to dark theme");
     await page.setViewportSize({ width: 320, height: 720 });
     assert.ok(
       await page.evaluate(
