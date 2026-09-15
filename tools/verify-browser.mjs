@@ -145,17 +145,14 @@ try {
     assert.deepEqual(documentListResponses, [401, 200]);
   });
   await check(
-    "missing selection produces an in-page actionable error",
+    "empty workspace disables asking and explains how to continue",
     async () => {
-      await page.locator("#composerInput").fill("Explain the privacy boundary");
+      assert.equal(await page.locator("#composerInput").isDisabled(), true);
+      assert.equal(await page.locator("#askBtn").isDisabled(), true);
       await page
-        .getByRole("button", { name: "Find supported answer", exact: true })
-        .click();
-      assert.ok(
-        (await page.locator("#ask-status").innerText()).includes(
-          "Choose an indexed source",
-        ),
-      );
+        .locator("#composerHint")
+        .getByText("Add a source to start asking questions.", { exact: true })
+        .waitFor();
     },
   );
   const source =
