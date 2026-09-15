@@ -201,8 +201,8 @@ try {
         .click();
       await page.waitForFunction(
         () =>
-          document.querySelectorAll("#thread .msg-answer .answer-card")
-            .length === 1 && !document.querySelector("#thread .thinking"),
+          document.querySelector("#thread .msg-answer .cite") &&
+          !document.querySelector("#thread .thinking"),
       );
       assert.ok(
         (
