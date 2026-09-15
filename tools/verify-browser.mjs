@@ -107,7 +107,7 @@ try {
   });
   await check("locked inventory and wrong-code rejection", async () => {
     assert.equal(await page.locator("#documents option").count(), 1);
-    await page.getByLabel("Access code", { exact: false }).fill("wrong-code");
+    await page.locator("#access-code").fill("wrong-code");
     await page
       .getByRole("button", { name: "Unlock workspace", exact: true })
       .click();
