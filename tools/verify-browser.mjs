@@ -108,24 +108,34 @@ try {
   await check("locked inventory and wrong-code rejection", async () => {
     assert.equal(await page.locator("#documents option").count(), 1);
     await page.locator("#access-code").fill("wrong-code");
+    const rejection = page.waitForResponse(
+      (response) =>
+        response.request().method() === "GET" &&
+        new URL(response.url()).pathname === "/api/documents" &&
+        response.status() === 401,
+    );
     await page
       .getByRole("button", { name: "Unlock workspace", exact: true })
       .click();
-    await page.waitForFunction(() =>
-      document
-        .querySelector("#access-status")
-        .textContent.includes("valid Textify access code"),
-    );
+    await rejection;
+    await page
+      .getByText("A valid Textify access code is required.", { exact: true })
+      .waitFor();
     assert.deepEqual(documentListResponses, [401]);
   });
   await check("unlock empty inventory and session-only code", async () => {
     await page.locator("#access-code").fill("synthetic-test-code");
+    const unlockResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === "GET" &&
+        new URL(response.url()).pathname === "/api/documents" &&
+        response.status() === 200,
+    );
     await page
       .getByRole("button", { name: "Unlock workspace", exact: true })
       .click();
-    await page.waitForFunction(() =>
-      document.querySelector("#access-status").textContent.includes("unlocked"),
-    );
+    await unlockResponse;
+    await page.locator("#askLockCard").waitFor({ state: "hidden" });
     assert.equal(
       await page.evaluate(() => sessionStorage.getItem("textify-access-code")),
       "synthetic-test-code",
@@ -280,14 +290,17 @@ try {
         delete window.__releaseStaleAsk;
       });
       await page.locator("#access-code").fill("synthetic-test-code");
+      const refreshResponse = page.waitForResponse(
+        (response) =>
+          response.request().method() === "GET" &&
+          new URL(response.url()).pathname === "/api/documents" &&
+          response.status() === 200,
+      );
       await page
         .getByRole("button", { name: "Unlock workspace", exact: true })
         .click();
-      await page.waitForFunction(() =>
-        document
-          .querySelector("#access-status")
-          .textContent.includes("unlocked"),
-      );
+      await refreshResponse;
+      await page.locator("#askLockCard").waitFor({ state: "hidden" });
       await page.waitForFunction(
         () => document.querySelectorAll("#documents option").length === 2,
       );
