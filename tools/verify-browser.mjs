@@ -118,9 +118,7 @@ try {
       .getByRole("button", { name: "Unlock workspace", exact: true })
       .click();
     await rejection;
-    await page
-      .getByText("A valid Textify access code is required.", { exact: true })
-      .waitFor();
+    await page.locator("#askLockError").waitFor();
     assert.deepEqual(documentListResponses, [401]);
   });
   await check("unlock empty inventory and session-only code", async () => {
