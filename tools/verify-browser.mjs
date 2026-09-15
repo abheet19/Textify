@@ -273,9 +273,7 @@ try {
       await page.waitForFunction(
         () => typeof window.__releaseStaleAsk === "function",
       );
-      await page
-        .getByRole("button", { name: "Lock workspace", exact: true })
-        .click();
+      await page.locator("#lockChip").click();
       await page.evaluate(() => window.__releaseStaleAsk());
       await page.waitForTimeout(50);
       assert.equal(await page.locator("#thread .msg-answer").count(), 0);
@@ -381,9 +379,7 @@ try {
   await check(
     "lock clears session credential and hides private source state",
     async () => {
-      await page
-        .getByRole("button", { name: "Lock workspace", exact: true })
-        .click();
+      await page.locator("#lockChip").click();
       assert.equal(
         await page.evaluate(() =>
           sessionStorage.getItem("textify-access-code"),
