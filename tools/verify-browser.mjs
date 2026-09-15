@@ -197,6 +197,9 @@ try {
     "ask returns visible source evidence without executing source HTML",
     async () => {
       await page
+        .locator("#composerInput")
+        .fill("How does the source protect private values?");
+      await page
         .getByRole("button", { name: "Find supported answer", exact: true })
         .click();
       await page.waitForFunction(
@@ -261,6 +264,9 @@ try {
           return window.__originalFetch(input, options);
         };
       });
+      await page
+        .locator("#composerInput")
+        .fill("Will a stale answer remain after I lock the workspace?");
       await page
         .getByRole("button", { name: "Find supported answer", exact: true })
         .click();
