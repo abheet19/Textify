@@ -130,6 +130,17 @@
     removeController?.abort();
   }
 
+  function clearConversation() {
+    thread.replaceChildren();
+    thread.appendChild(threadEmpty);
+    threadEmpty.hidden = false;
+    thread._citeMap = {};
+    askGrid.classList.remove("detail-open");
+    detailFile.textContent = "";
+    detailExcerpt.textContent = "";
+    detailProvenance.textContent = "";
+  }
+
   /* ---------- toast ---------- */
   const toastEl = $("#toast");
   const toastText = $("#toastText");
@@ -227,6 +238,7 @@
   }
   function lockWorkspace() {
     beginWorkspaceTransition();
+    clearConversation();
     setCode("");
     if (uploadStatus)
       uploadStatus.textContent =
@@ -1174,7 +1186,7 @@
       );
       if (version !== workspaceVersion || controller !== removeController)
         return;
-      if (wasSelected) askGrid.classList.remove("detail-open");
+      if (wasSelected) clearConversation();
       await refresh(wasSelected ? "" : docs.value);
       if (askStatus)
         askStatus.textContent = "Source and stored passages removed.";

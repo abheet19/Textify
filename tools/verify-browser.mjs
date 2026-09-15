@@ -200,16 +200,21 @@ try {
         .getByRole("button", { name: "Find supported answer", exact: true })
         .click();
       await page.waitForFunction(
-        () => !document.querySelector("#answer").classList.contains("hidden"),
+        () =>
+          document.querySelectorAll("#thread .msg-answer .answer-card")
+            .length === 1 && !document.querySelector("#thread .thinking"),
       );
       assert.ok(
-        (await page.locator("#answer-text").innerText()).includes("[S1]"),
+        (
+          await page.locator("#thread .msg-answer .answer-card").innerText()
+        ).includes("1"),
       );
+      await page.locator("#thread .cite").first().click();
       assert.ok(
-        (await page.locator("#citations").innerText()).includes("<img"),
+        (await page.locator("#detailExcerpt").innerText()).includes("<img"),
       );
       assert.equal(
-        await page.locator("#citations img, #citations svg").count(),
+        await page.locator("#detailExcerpt img, #detailExcerpt svg").count(),
         0,
       );
       assert.equal(await page.evaluate(() => window.__sourceXss), undefined);
@@ -267,7 +272,7 @@ try {
         .click();
       await page.evaluate(() => window.__releaseStaleAsk());
       await page.waitForTimeout(50);
-      assert.equal(await page.locator("#answer").isVisible(), false);
+      assert.equal(await page.locator("#thread .msg-answer").count(), 0);
       assert.equal(
         (await page.locator("body").innerText()).includes("STALE PRIVATE"),
         false,
@@ -333,7 +338,7 @@ try {
         document.querySelector("#ask-status").textContent.includes("removed"),
       );
       assert.equal(await page.locator("#documents option").count(), 1);
-      assert.equal(await page.locator("#answer").isVisible(), false);
+      assert.equal(await page.locator("#thread .msg-answer").count(), 0);
     },
   );
   await check("theme state, keyboard focus, and 320px reflow", async () => {
@@ -380,7 +385,7 @@ try {
         null,
       );
       assert.equal(await page.locator("#documents option").count(), 1);
-      assert.equal(await page.locator("#answer").isVisible(), false);
+      assert.equal(await page.locator("#thread .msg-answer").count(), 0);
     },
   );
   await check(
