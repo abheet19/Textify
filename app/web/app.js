@@ -55,6 +55,28 @@
   const uploadStatus = $("#upload-status");
   const askStatus = $("#ask-status");
 
+  async function loadRuntimeSummary() {
+    const target = $("#embeddingRuntime");
+    if (!target) return;
+    try {
+      const response = await fetch("/health", { cache: "no-store" });
+      const data = await readResponse(response);
+      const provider =
+        data.embedding_provider === "local"
+          ? "local BGE"
+          : data.embedding_provider === "openai"
+            ? "OpenAI"
+            : data.embedding_provider;
+      const dimensions = Number(data.embedding_dimensions);
+      target.textContent =
+        provider && Number.isFinite(dimensions)
+          ? `${provider} · ${dimensions}-d`
+          : "Configured by server";
+    } catch {
+      target.textContent = "Configured by server";
+    }
+  }
+
   /* ---------- helpers ---------- */
   function currentCode() {
     try {
@@ -1340,5 +1362,6 @@
   goTo("ask");
   applyLockUI();
   renderRate();
+  loadRuntimeSummary();
   refresh();
 })();
