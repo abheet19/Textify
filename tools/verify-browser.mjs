@@ -147,9 +147,7 @@ try {
   await check(
     "missing selection produces an in-page actionable error",
     async () => {
-      await page
-        .getByLabel("Question", { exact: true })
-        .fill("Explain the privacy boundary");
+      await page.locator("#composerInput").fill("Explain the privacy boundary");
       await page
         .getByRole("button", { name: "Find supported answer", exact: true })
         .click();
