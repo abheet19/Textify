@@ -323,6 +323,7 @@ try {
           .querySelector("#upload-status")
           .textContent.includes("Request budget reached"),
       );
+      await page.getByRole("button", { name: "Sources", exact: true }).click();
       assert.equal(await page.locator("#dropzone").isVisible(), true);
     },
   );
