@@ -303,6 +303,7 @@
     list.replaceChildren();
     const row = document.createElement("div");
     row.className = "source-row";
+    row.setAttribute("role", "listitem");
     row.dataset.row = data.id;
     const item = document.createElement("button");
     item.type = "button";
@@ -419,6 +420,7 @@
     for (const d of data) {
       const row = document.createElement("div");
       row.className = "source-row";
+      row.setAttribute("role", "listitem");
       row.dataset.row = d.id;
 
       const item = document.createElement("button");
@@ -885,6 +887,7 @@
     const id = "pending_" + Date.now();
     const row = document.createElement("div");
     row.className = "source-row";
+    row.setAttribute("role", "listitem");
     row.dataset.pending = id;
     row.innerHTML =
       '<div class="source-item"><span class="status-dot indexing"></span><span class="source-item-body"><span class="source-name"></span><span class="source-sub">indexing…</span></span></div>';
