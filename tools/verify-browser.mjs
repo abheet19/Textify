@@ -331,14 +331,10 @@ try {
     "remove-source confirmation cancels then accepts and clears evidence",
     async () => {
       page.once("dialog", (dialog) => dialog.dismiss());
-      await page
-        .getByRole("button", { name: "Remove source", exact: true })
-        .click();
+      await page.locator("#sourcesTbody [data-remove-row]").click();
       assert.equal(await page.locator("#documents option").count(), 2);
       page.once("dialog", (dialog) => dialog.accept());
-      await page
-        .getByRole("button", { name: "Remove source", exact: true })
-        .click();
+      await page.locator("#sourcesTbody [data-remove-row]").click();
       await page.waitForFunction(() =>
         document.querySelector("#ask-status").textContent.includes("removed"),
       );
