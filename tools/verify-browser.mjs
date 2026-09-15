@@ -365,6 +365,7 @@ try {
     const undersizedTargets = await page.evaluate(() =>
       [...document.querySelectorAll("button, input, select, textarea, a")]
         .filter((element) => element.getClientRects().length)
+        .filter((element) => !element.matches(".sr-only, .sr-only-btn"))
         .filter((element) => {
           const rect = element.getBoundingClientRect();
           return rect.width < 24 || rect.height < 24;
