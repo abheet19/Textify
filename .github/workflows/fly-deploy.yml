@@ -33,7 +33,7 @@ jobs:
           PROVIDER: ${{ inputs.embedding_provider }}
         run: |
           set -eu
-          names="$(flyctl secrets list --app textify-abheet19)"
+          names="$(flyctl secrets list --app textify-abheet19 --json)"
           required_names="DATABASE_URL TEXTIFY_ACCESS_CODE"
           if [ "$PROVIDER" = "openai" ]; then
             required_names="$required_names OPENAI_API_KEY"
@@ -41,12 +41,8 @@ jobs:
           else
             echo "FLY_CONFIG=fly.local-embeddings.toml" >> "$GITHUB_ENV"
           fi
-          for required in $required_names; do
-            if ! printf '%s' "$names" | grep -q "^$required[[:space:]]"; then
-              echo "::error::Missing required Fly configuration: $required. Live app was not changed."
-              exit 1
-            fi
-          done
+          # Parse the machine-readable format; CLI table padding/colors are not a contract.
+          printf '%s' "$names" | python -c 'import json, sys; names = {entry["name"] for entry in json.load(sys.stdin)}; missing = set(sys.argv[1:]) - names; print("Missing required Fly configuration: " + ", ".join(sorted(missing)) if missing else "Required configuration names are present"); sys.exit(bool(missing))' $required_names
       - name: Deploy the fully verified selected revision
         run: flyctl deploy --remote-only --config "$FLY_CONFIG" --app textify-abheet19 --build-arg "VCS_REF=${GITHUB_SHA}" --wait-timeout 10m
         env:
