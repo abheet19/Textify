@@ -68,6 +68,13 @@ const auditAccessibility = async () => {
       nodes: violation.nodes.length,
     })),
     [],
+    JSON.stringify(
+      result.violations.map((violation) => ({
+        id: violation.id,
+        impact: violation.impact,
+        targets: violation.nodes.map((node) => node.target),
+      })),
+    ),
   );
 };
 
