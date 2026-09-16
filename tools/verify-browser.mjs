@@ -400,6 +400,8 @@ try {
     "read-only demo exposes one consistent source and readable citations",
     async () => {
       await page.setViewportSize({ width: 1280, height: 900 });
+      // The previous scenario locks the Sources view; the demo entry lives in Ask.
+      await page.getByRole("button", { name: "Ask", exact: true }).click();
       await page
         .getByRole("button", {
           name: "Try the read-only demo — no code needed",
