@@ -884,6 +884,11 @@
     const map = thread._citeMap || {};
     const c = map[key];
     if (!c) return;
+    // The transient "answer ready" toast otherwise covers the excerpt and its
+    // action on a 320 px screen. Opening evidence is the user's next state, so
+    // dismiss the stale notice before revealing the detail panel.
+    clearTimeout(toastTimer);
+    toastEl.classList.remove("show");
     detailFile.textContent = `${detailDocName || "Source"} · chunk #${c.chunk}`;
     detailExcerpt.textContent = c.text;
     detailProvenance.textContent = `Retrieved via pgvector · chunk #${c.chunk}`;

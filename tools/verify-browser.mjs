@@ -435,6 +435,19 @@ try {
         (await citation.getAttribute("aria-label")) || "",
         /^Open source S\d+ excerpt$/,
       );
+      assert.equal(
+        await page.locator("#toast").evaluate((node) => node.classList.contains("show")),
+        true,
+      );
+      await citation.click();
+      assert.equal(
+        await page.locator("#askGrid").evaluate((node) => node.classList.contains("detail-open")),
+        true,
+      );
+      assert.equal(
+        await page.locator("#toast").evaluate((node) => node.classList.contains("show")),
+        false,
+      );
     },
   );
   const expectedConsoleStatusPattern =
