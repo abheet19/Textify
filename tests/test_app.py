@@ -143,11 +143,47 @@ def test_mcp_manifest_describes_the_real_routes_and_current_auth_state(monkeypat
     assert response.headers["Cache-Control"] == "no-store"
     body = response.json()
     assert body["name"] == "textify"
+    assert body["transport"] == {"type": "streamable-http", "endpoint": "/mcp"}
+    assert [tool["name"] for tool in body["mcp_tools"]] == ["list_demo_sources", "ask_demo_question"]
     assert body["auth"] == {"type": "header", "header": "X-Textify-Access-Code", "required": False}
     routes = {tool["name"]: tool["http"] for tool in body["tools"]}
     assert routes["list_sources"] == {"method": "GET", "path": "/api/documents"}
     assert routes["ask_question"]["method"] == "POST" and routes["ask_question"]["path"] == "/api/ask"
     assert routes["remove_source"]["path"] == "/api/documents/{document_id}"
+
+
+def test_mcp_streamable_http_initializes_and_lists_only_public_read_only_tools(monkeypatch):
+    monkeypatch.setenv("TEXTIFY_SKIP_DB_INIT", "1")
+    from app.main import app
+
+    headers = {"accept": "application/json, text/event-stream", "content-type": "application/json"}
+    with TestClient(app) as client:
+        initialized = client.post(
+            "/mcp",
+            headers=headers,
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-06-18",
+                    "capabilities": {},
+                    "clientInfo": {"name": "textify-test", "version": "1"},
+                },
+            },
+        )
+        listed = client.post(
+            "/mcp",
+            headers=headers,
+            json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+        )
+
+    assert initialized.status_code == 200
+    assert initialized.json()["result"]["serverInfo"]["name"] == "textify"
+    assert listed.status_code == 200
+    tools = listed.json()["result"]["tools"]
+    assert [tool["name"] for tool in tools] == ["list_demo_sources", "ask_demo_question"]
+    assert all(tool["annotations"]["readOnlyHint"] is True for tool in tools)
 
 
 def test_mcp_manifest_reflects_a_configured_access_code(monkeypatch):

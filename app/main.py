@@ -20,6 +20,9 @@ from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from mcp.server.fastmcp import Context, FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
+from mcp.types import ToolAnnotations
 from pgvector.sqlalchemy import Vector
 from pydantic import BaseModel, Field
 from pypdf import PdfReader
@@ -120,6 +123,13 @@ DEMO_QUESTIONS = [
     "What are the two main stages of a RAG system?",
     "Why does retrieval-augmented generation reduce hallucinations?",
 ]
+
+READ_ONLY_TOOL = ToolAnnotations(
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False,
+)
 
 
 @asynccontextmanager
@@ -420,21 +430,31 @@ def ready():
 
 @app.get("/mcp/manifest.json")
 def mcp_manifest():
-    """A static, honest description of this API for MCP-aware callers.
+    """Describe both the live public MCP surface and the private REST workspace.
 
-    This is documentation, not a protocol server: it describes the exact
-    REST routes below (their real auth header, real budgets, real request
-    shape) so another agent in the same ecosystem — Vantage's MCP server,
-    or a future Command/Zeno orchestrator — can discover what Textify can
-    do without guessing at undocumented endpoints. Calling a tool still
-    means calling its listed HTTP route directly; every existing guardrail
-    (access code, rate budget, 3 MB/500-char caps) still applies there.
+    POST /mcp is a real stateless Streamable HTTP server over the synthetic,
+    read-only demo. The private upload/list/ask/delete APIs remain access-code
+    protected and are documented separately; they are never exposed as public
+    MCP tools.
     """
     return {
         "schema_version": "2024-11-05",
         "name": "textify",
         "description": "Evidence-first study workspace: index a private PDF/DOCX/TXT source, then ask cited questions.",
         "ecosystem": "https://github.com/abheet19",
+        "transport": {"type": "streamable-http", "endpoint": "/mcp"},
+        "mcp_tools": [
+            {
+                "name": "list_demo_sources",
+                "description": "List the one public synthetic source and its prepared questions.",
+                "read_only": True,
+            },
+            {
+                "name": "ask_demo_question",
+                "description": "Ask a cited question against only the public synthetic source.",
+                "read_only": True,
+            },
+        ],
         "auth": {
             "type": "header",
             "header": "X-Textify-Access-Code",
@@ -579,6 +599,10 @@ def demo_workspace():
     No access code. Exposes only the single seeded demo record — never any
     private source. Self-heals if startup seeding had not completed yet.
     """
+    return _demo_workspace_payload()
+
+
+def _demo_workspace_payload():
     try:
         seeded = ensure_demo_seeded()
     except Exception as error:
@@ -608,13 +632,17 @@ def demo_ask(request: Request, payload: DemoAskRequest):
     can never point this route at a private source, and nothing is written.
     """
     require_public_budget(request, "demo-ask")
+    return _demo_answer_payload(payload.question)
+
+
+def _demo_answer_payload(question: str):
     try:
         seeded = ensure_demo_seeded()
     except Exception as error:
         raise HTTPException(503, "The read-only demo is warming up. Try again shortly.") from error
     if not seeded:
         raise HTTPException(503, "The read-only demo is warming up. Try again shortly.")
-    query = embed([payload.question], query=True)[0]
+    query = embed([question], query=True)[0]
     with SessionLocal() as session:
         rows = (
             session.query(StudyChunk)
@@ -627,7 +655,7 @@ def demo_ask(request: Request, payload: DemoAskRequest):
         raise HTTPException(503, "The read-only demo is warming up. Try again shortly.")
     citations = [{"source": f"S{i + 1}", "chunk": row.position + 1, "text": row.content} for i, row in enumerate(rows)]
     try:
-        answer, mode = grounded_answer(payload.question, [row.content for row in rows])
+        answer, mode = grounded_answer(question, [row.content for row in rows])
     except requests.Timeout as error:
         raise HTTPException(504, "The answer provider timed out. Try again later.") from error
     except requests.RequestException as error:
@@ -635,6 +663,71 @@ def demo_ask(request: Request, payload: DemoAskRequest):
     except (ValueError, KeyError, TypeError, IndexError, RuntimeError) as error:
         raise HTTPException(502, "The answer provider returned an invalid response.") from error
     return {"answer": answer, "generation_mode": mode, "citations": citations}
+
+
+def build_textify_mcp() -> FastMCP:
+    """Build one stateless server for one HTTP request, just like Vantage."""
+    fly_host = f"{os.getenv('FLY_APP_NAME', 'textify-abheet19')}.fly.dev"
+    server = FastMCP(
+        "textify",
+        instructions=(
+            "Read-only access to Textify's public synthetic RAG demo. List the seeded source, then ask cited "
+            "questions against that source. These tools cannot read, upload, or delete private workspace documents."
+        ),
+        stateless_http=True,
+        json_response=True,
+        transport_security=TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=[fly_host, "textify-abheet19.fly.dev", "testserver", "localhost:*", "127.0.0.1:*"],
+            allowed_origins=[
+                f"https://{fly_host}",
+                "https://textify-abheet19.fly.dev",
+                "http://testserver",
+                "http://localhost:*",
+                "http://127.0.0.1:*",
+            ],
+        ),
+    )
+
+    @server.tool(annotations=READ_ONLY_TOOL, structured_output=True)
+    def list_demo_sources() -> dict[str, object]:
+        """List Textify's public synthetic source without exposing private documents."""
+        demo = _demo_workspace_payload()
+        return {
+            "sources": [
+                {
+                    "id": demo["id"],
+                    "name": demo["name"],
+                    "chunks": demo["chunks"],
+                    "read_only": True,
+                    "questions": demo["questions"],
+                }
+            ]
+        }
+
+    @server.tool(annotations=READ_ONLY_TOOL, structured_output=True)
+    def ask_demo_question(
+        question: Annotated[str, Field(min_length=6, max_length=500)],
+        ctx: Context,
+    ) -> dict[str, object]:
+        """Answer from the public synthetic RAG source and return visible citations."""
+        request = ctx.request_context.request
+        if request is None:
+            raise RuntimeError("HTTP request context is required")
+        require_public_budget(request, "mcp-demo-ask")
+        return _demo_answer_payload(question)
+
+    return server
+
+
+class StatelessTextifyMcp:
+    """Create and close a fresh FastMCP session manager for every request."""
+
+    async def __call__(self, scope, receive, send) -> None:
+        server = build_textify_mcp()
+        protocol_app = server.streamable_http_app()
+        async with server.session_manager.run():
+            await protocol_app(scope, receive, send)
 
 
 @app.delete("/api/documents/{document_id}", status_code=204)
@@ -652,3 +745,8 @@ def delete_document(document_id: str, request: Request):
 @app.get("/")
 def home():
     return FileResponse(Path(__file__).parent / "web" / "index.html")
+
+
+# Mounted last so Textify's existing HTTP routes keep precedence. The MCP
+# sub-application owns /mcp and creates a fresh stateless server per request.
+app.mount("/", StatelessTextifyMcp())
